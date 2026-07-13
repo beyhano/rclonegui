@@ -240,6 +240,7 @@ pub fn rclone_mount_list(state: State<'_, AppState>) -> Result<Vec<MountInfo>, S
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::task_repo::TaskRepo;
     use rusqlite::Connection;
 
     // ------------------------------------------------------------------
@@ -251,7 +252,7 @@ mod tests {
     #[test]
     fn test_get_rclone_path_none_returns_error() {
         let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn);
+        let state = AppState::new(conn, TaskRepo::new(Connection::open_in_memory().unwrap()));
         let result = get_rclone_path(&state);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "No rclone binary configured");
@@ -261,7 +262,7 @@ mod tests {
     fn test_rclone_version_without_binary_returns_error() {
         // rclone_version calls get_rclone_path first — verify error propagation
         let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn);
+        let state = AppState::new(conn, TaskRepo::new(Connection::open_in_memory().unwrap()));
         let result = get_rclone_path(&state);
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -274,7 +275,7 @@ mod tests {
     #[test]
     fn test_get_rclone_path_with_value() {
         let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn);
+        let state = AppState::new(conn, TaskRepo::new(Connection::open_in_memory().unwrap()));
         let path = PathBuf::from("/usr/local/bin/rclone");
         *state.rclone_path.lock().unwrap() = Some(path.clone());
         let result = get_rclone_path(&state);
@@ -285,7 +286,7 @@ mod tests {
     #[test]
     fn test_mount_list_empty_when_no_mounts() {
         let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn);
+        let state = AppState::new(conn, TaskRepo::new(Connection::open_in_memory().unwrap()));
         let guard = state.mounts.lock().unwrap();
         assert!(guard.is_empty());
     }
@@ -293,7 +294,7 @@ mod tests {
     #[test]
     fn test_mount_list_returns_stored_mounts() {
         let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn);
+        let state = AppState::new(conn, TaskRepo::new(Connection::open_in_memory().unwrap()));
         let mount = MountInfo {
             id: "test-id".into(),
             remote: "gdrive:".into(),
@@ -313,7 +314,7 @@ mod tests {
     #[test]
     fn test_mount_lifecycle_running_to_released() {
         let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn);
+        let state = AppState::new(conn, TaskRepo::new(Connection::open_in_memory().unwrap()));
         let mount_id = Uuid::new_v4();
 
         // Phase 1: Mount started — insert ProcessHandle + MountInfo

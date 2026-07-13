@@ -44,15 +44,17 @@ pub struct AppState {
     pub rclone_path: Arc<Mutex<Option<PathBuf>>>,
     pub db: Arc<Mutex<Connection>>,
     pub mounts: Arc<Mutex<HashMap<Uuid, MountInfo>>>,
+    pub task_repo: Arc<Mutex<crate::db::task_repo::TaskRepo>>,
 }
 
 impl AppState {
-    pub fn new(db: Connection) -> Self {
+    pub fn new(db: Connection, task_repo: crate::db::task_repo::TaskRepo) -> Self {
         Self {
             processes: Arc::new(Mutex::new(HashMap::new())),
             rclone_path: Arc::new(Mutex::new(None)),
             db: Arc::new(Mutex::new(db)),
             mounts: Arc::new(Mutex::new(HashMap::new())),
+            task_repo: Arc::new(Mutex::new(task_repo)),
         }
     }
 }
@@ -60,11 +62,13 @@ impl AppState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::task_repo::TaskRepo;
 
     #[test]
     fn test_app_state_creation() {
         let db = Connection::open_in_memory().unwrap();
-        let state = AppState::new(db);
+        let repo = TaskRepo::new(Connection::open_in_memory().unwrap());
+        let state = AppState::new(db, repo);
 
         assert!(state.processes.lock().unwrap().is_empty());
         assert!(state.rclone_path.lock().unwrap().is_none());

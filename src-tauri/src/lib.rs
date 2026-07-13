@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use rusqlite::Connection;
 use tauri::Manager;
 
+use crate::db::task_repo::TaskRepo;
 use crate::rclone::process::ProcessManager;
 use crate::state::AppState;
 
@@ -26,6 +27,12 @@ pub fn run() {
             commands::rclone_cmds::rclone_mount,
             commands::rclone_cmds::rclone_unmount,
             commands::rclone_cmds::rclone_mount_list,
+            commands::task_cmds::task_list,
+            commands::task_cmds::task_create,
+            commands::task_cmds::task_update,
+            commands::task_cmds::task_delete,
+            commands::task_cmds::task_toggle,
+            commands::task_cmds::rclone_providers,
         ])
         .setup(|app| {
             // Initialize SQLite database in the app data directory
@@ -58,7 +65,11 @@ pub fn run() {
                 })
                 .or_else(|| rclone::discovery::find_binary(platform));
 
-            let state = AppState::new(conn);
+            let task_conn = Connection::open(&db_path)
+                .expect("failed to open SQLite database for TaskRepo");
+            let task_repo = TaskRepo::new(task_conn);
+
+            let state = AppState::new(conn, task_repo);
             if let Some(ref path) = rclone_path {
                 *state.rclone_path.lock().expect("lock rclone_path") = Some(path.clone());
             }
