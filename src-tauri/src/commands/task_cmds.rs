@@ -258,6 +258,28 @@ pub async fn task_toggle(state: State<'_, AppState>, id: String) -> Result<Task,
     Ok(task)
 }
 
+/// Run a task immediately, bypassing its schedule.
+#[tauri::command]
+pub async fn task_run_now(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    // Get the task
+    let task_id = id.clone();
+    let task = {
+        let repo = state.task_repo.lock().await;
+        repo.get_by_id(&task_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "Task not found".to_string())?
+    };
+
+    // Execute via scheduler if available
+    let sched = state.scheduler.lock().await;
+    if let Some(ref scheduler) = *sched {
+        scheduler.run_now(&task).await;
+        Ok(())
+    } else {
+        Err("Scheduler not initialized".to_string())
+    }
+}
+
 /// Fetch available rclone providers by running `rclone config providers`.
 ///
 /// Returns the raw JSON output from rclone, parsed as a `serde_json::Value`.
