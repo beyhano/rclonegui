@@ -404,3 +404,50 @@ button {
     color: #ef9a9a;
   }
 }
+
+/* Scheduler */
+.scheduler-page { padding: 1rem; }
+.scheduler-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.scheduler-header h2 { margin: 0; }
+.task-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.task-card { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; background: #fff; }
+.task-card.disabled { opacity: 0.6; }
+.task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.task-header h3 { margin: 0; }
+.task-slug { color: #888; font-size: 0.85rem; font-family: monospace; }
+.task-details { display: flex; gap: 1rem; margin-bottom: 0.5rem; font-size: 0.9rem; color: #555; }
+.task-actions { display: flex; gap: 0.5rem; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal { background: #fff; border-radius: 12px; padding: 2rem; min-width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; }
+.modal h2 { margin-top: 0; }
+.modal-step { display: flex; flex-direction: column; gap: 1rem; }
+.modal-step label { font-weight: 600; }
+.modal-step input, .modal-step select, .modal-step textarea { padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px; font-size: 1rem; }
+.modal-step textarea { min-height: 80px; font-family: monospace; }
+.modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.5rem; }
+.provider-config-form { display: flex; flex-direction: column; gap: 1rem; }
+.config-field { display: flex; flex-direction: column; gap: 0.25rem; }
+.config-field--bool { flex-direction: row; align-items: center; }
+.config-field input[type="checkbox"] { width: auto; }
+.config-advanced { border: 1px dashed #ccc; padding: 0.75rem; border-radius: 6px; margin-top: 0.5rem; }
+.config-empty { color: #888; font-style: italic; }
+.cron-input { display: flex; flex-direction: column; gap: 0.75rem; }
+.cron-presets { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.cron-preset { padding: 0.35rem 0.75rem; border: 1px solid #ccc; border-radius: 6px; background: #f5f5f5; cursor: pointer; font-size: 0.85rem; }
+.cron-preset.active { background: #0078d4; color: #fff; border-color: #0078d4; }
+.error { color: #d32f2f; font-size: 0.9rem; }
+.empty-state { text-align: center; color: #888; padding: 3rem; }
+.btn-primary { background: #0078d4; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
+.btn-primary:hover { background: #005a9e; }
+
+@media (prefers-color-scheme: dark) {
+  .task-card { border-color: #444; background: #1e1e1e; }
+  .task-slug { color: #999; }
+  .task-details { color: #aaa; }
+  .modal { background: #1e1e1e; }
+  .modal-step input, .modal-step select, .modal-step textarea { background: #333; color: #eee; border-color: #555; }
+  .cron-preset { background: #333; color: #eee; border-color: #555; }
+  .cron-preset.active { background: #0078d4; color: #fff; }
+  .config-advanced { border-color: #555; }
+  .modal-overlay { background: rgba(0,0,0,0.7); }
+}

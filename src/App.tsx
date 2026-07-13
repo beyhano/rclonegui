@@ -2,9 +2,10 @@ import { useState } from "react";
 import ConfigPanel from "./ConfigPanel";
 import TransferPanel from "./TransferPanel";
 import MountPanel from "./MountPanel";
+import SchedulerPage from "./components/SchedulerPage";
 import "./App.css";
 
-type Tab = "config" | "transfer" | "mounts";
+type Tab = "config" | "transfer" | "mounts" | "scheduler";
 
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>("config");
@@ -31,11 +32,16 @@ function App() {
         >
           Mounts
         </button>
+        <button
+          className={`tab ${activeTab === "scheduler" ? "active" : ""}`}
+          onClick={() => setActiveTab("scheduler")}
+        >Scheduler</button>
       </nav>
       <main className="panel">
         {activeTab === "config" && <ConfigPanel />}
         {activeTab === "transfer" && <TransferPanel />}
         {activeTab === "mounts" && <MountPanel />}
+        {activeTab === "scheduler" && <SchedulerPage />}
       </main>
     </div>
   );
