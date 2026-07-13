@@ -12,6 +12,7 @@ use rusqlite::Connection;
 /// - `transfers` — Tracks rclone copy/sync operations with status and progress.
 /// - `mounts` — Tracks rclone mount processes and their state.
 /// - `app_config` — Simple key-value store for application settings.
+/// - `tasks` — Scheduled task definitions for automated transfers.
 ///
 /// # Errors
 ///
@@ -60,27 +61,44 @@ pub fn create_tables(conn: &Connection) -> rusqlite::Result<()> {
             created_at      TEXT NOT NULL,
             updated_at      TEXT NOT NULL
         );
-
-        CREATE TABLE IF NOT EXISTS transfers_v2 (
-            id            TEXT PRIMARY KEY,
-            remote_src    TEXT NOT NULL,
-            remote_dest   TEXT NOT NULL,
-            status        TEXT NOT NULL DEFAULT 'running',
-            progress      REAL DEFAULT 0.0,
-            speed         TEXT,
-            started_at    TEXT NOT NULL,
-            completed_at  TEXT,
-            error_message TEXT,
-            task_id       TEXT
-        );
-        INSERT OR IGNORE INTO transfers_v2 SELECT id, remote_src, remote_dest, status, progress, speed, started_at, completed_at, error_message, NULL as task_id FROM transfers;
-        DROP TABLE transfers;
-        ALTER TABLE transfers_v2 RENAME TO transfers;
         ",
-    )
+    )?;
+
+    // Only run transfer migration if transfers doesn't already have task_id
+    let has_task_id: bool = conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('transfers') WHERE name='task_id'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+
+    if !has_task_id {
+        conn.execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS transfers_v2 (
+                id            TEXT PRIMARY KEY,
+                remote_src    TEXT NOT NULL,
+                remote_dest   TEXT NOT NULL,
+                status        TEXT NOT NULL DEFAULT 'running',
+                progress      REAL DEFAULT 0.0,
+                speed         TEXT,
+                started_at    TEXT NOT NULL,
+                completed_at  TEXT,
+                error_message TEXT,
+                task_id       TEXT
+            );
+            INSERT OR IGNORE INTO transfers_v2 SELECT id, remote_src, remote_dest, status, progress, speed, started_at, completed_at, error_message, NULL as task_id FROM transfers;
+            DROP TABLE transfers;
+            ALTER TABLE transfers_v2 RENAME TO transfers;
+            ",
+        )?;
+    }
+
+    Ok(())
 }
 
-// ----- Task 3.5 RED test: create_tables asserts all 3 tables exist -----
+// ----- create_tables asserts all 4 tables exist (transfers, mounts, app_config, tasks) -----
 
 #[cfg(test)]
 mod tests {
@@ -188,6 +206,7 @@ mod tests {
         assert_eq!(columns.len(), 10, "transfers should have 10 columns (added task_id)");
         assert_eq!(columns[0], ("id".to_string(), "TEXT".to_string()));
         assert_eq!(columns[1], ("remote_src".to_string(), "TEXT".to_string()));
+        assert_eq!(columns[9], ("task_id".to_string(), "TEXT".to_string()));
     }
 
     #[test]

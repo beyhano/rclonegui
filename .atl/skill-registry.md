@@ -6,10 +6,13 @@ Last updated: 2026-07-13
 
 ## Sources scanned
 
-- /home/beyhan/.agents/skills
-- /home/beyhan/.config/opencode/skills
-- /home/beyhan/.claude/skills
-- /home/beyhan/.copilot/skills
+- C:\Users\Beyhan\.agents\skills
+- C:\Users\Beyhan\.config\opencode\skills
+- C:\Users\Beyhan\.claude\skills
+- C:\Users\Beyhan\.gemini\skills
+- C:\Users\Beyhan\.cursor\skills
+- C:\Users\Beyhan\.copilot\skills
+- C:\Users\Beyhan\.hermes\skills
 
 ## Contract
 
@@ -21,25 +24,19 @@ Last updated: 2026-07-13
 
 | Skill | Trigger / description | Scope | Path |
 | --- | --- | --- | --- |
-| `SQLite Database Expert` | Expert in SQLite embedded database development for Tauri/desktop applications with focus on SQL injection prevention, migrations, FTS search, and secure data handling | user | `/home/beyhan/.agents/skills/sqlite-database-expert/SKILL.md` |
-| `branch-pr` | Create Gentle AI pull requests with issue-first checks. Trigger: creating, opening, or preparing PRs for review. | user | `/home/beyhan/.config/opencode/skills/branch-pr/SKILL.md` |
-| `customize-opencode` | Use ONLY when the user is editing or creating opencode's own configuration: opencode.json, opencode.jsonc, files under .opencode/, or files under ~/.config/opencode/. Also use when creating or fixing opencode agents, subagents, skills, plugins, MCP servers, or permission rules. Do not use for the user's own application code, or for any project that is not configuring opencode itself. | user | `<built-in>` |
-| `chained-pr` | Trigger: PRs over 400 lines, stacked PRs, review slices. Split oversized changes into chained PRs that protect review focus. | user | `/home/beyhan/.config/opencode/skills/chained-pr/SKILL.md` |
-| `cognitive-doc-design` | Design docs that reduce cognitive load. Trigger: writing guides, READMEs, RFCs, onboarding, architecture, or review-facing docs. | user | `/home/beyhan/.config/opencode/skills/cognitive-doc-design/SKILL.md` |
-| `comment-writer` | Write warm, direct collaboration comments. Trigger: PR feedback, issue replies, reviews, Slack messages, or GitHub comments. | user | `/home/beyhan/.config/opencode/skills/comment-writer/SKILL.md` |
-| `find-skills` | Helps users discover and install agent skills when they ask questions like "how do I do X", "find a skill for X", "is there a skill that can...", or express interest in extending capabilities. This skill should be used when the user is looking for functionality that might exist as an installable skill. | user | `/home/beyhan/.agents/skills/find-skills/SKILL.md` |
-| `frontend-design` | Guidance for distinctive, intentional visual design when building new UI or reshaping an existing one. Helps with aesthetic direction, typography, and making choices that don't read as templated defaults. | user | `/home/beyhan/.agents/skills/frontend-design/SKILL.md` |
-| `go-testing` | Trigger: Go tests, go test coverage, Bubbletea teatest, golden files. Apply focused Go testing patterns. | user | `/home/beyhan/.config/opencode/skills/go-testing/SKILL.md` |
-| `issue-creation` | Create Gentle AI issues with issue-first checks. Trigger: creating GitHub issues, bug reports, or feature requests. | user | `/home/beyhan/.config/opencode/skills/issue-creation/SKILL.md` |
-| `judgment-day` | Trigger: judgment day, dual review, adversarial review, juzgar. Run explicit blind dual review with at most two scoped fix/re-judgment rounds. | user | `/home/beyhan/.config/opencode/skills/judgment-day/SKILL.md` |
-| `rust-best-practices` | Guide for writing idiomatic Rust code based on Apollo GraphQL's best practices handbook. Use this skill when: (1) writing new Rust code or functions, (2) reviewing or refactoring existing Rust code, (3) deciding between borrowing vs cloning or ownership patterns, (4) implementing error handling with Result types, (5) optimizing Rust code for performance, (6) writing tests or documentation for Rust projects. | user | `/home/beyhan/.agents/skills/rust-best-practices/SKILL.md` |
-| `shadcn` | Manages shadcn components and projects — adding, searching, fixing, debugging, styling, and composing UI, including chat interfaces. Provides project context, component docs, and usage examples. Applies when working with shadcn/ui, component registries, presets, --preset codes, or any project with a components.json file. Also triggers for "shadcn init", "create an app with --preset", or "switch to --preset". | user | `/home/beyhan/.agents/skills/shadcn/SKILL.md` |
-| `skill-creator` | Trigger: new skills, agent instructions, documenting AI usage patterns. Create LLM-first skills with valid frontmatter. | user | `/home/beyhan/.config/opencode/skills/skill-creator/SKILL.md` |
-| `skill-improver` | Trigger: improve skills, audit skills, refactor skills, skill quality. Audit and upgrade existing LLM-first skills. | user | `/home/beyhan/.config/opencode/skills/skill-improver/SKILL.md` |
-| `tailwind-design-system` | Build scalable design systems with Tailwind CSS v4, design tokens, component libraries, and responsive patterns. Use when creating component libraries, implementing design systems, or standardizing UI patterns. | user | `/home/beyhan/.agents/skills/tailwind-design-system/SKILL.md` |
-| `tauri-v2` | Tauri v2+ cross-platform app development with Rust backend. Use when configuring tauri.conf.json, implementing Rust commands (#[tauri::command]), setting up IPC patterns (invoke, emit, channels), configuring permissions/capabilities, troubleshooting build issues, or deploying desktop/mobile apps. Triggers on Tauri, src-tauri, invoke, emit, capabilities.json. | user | `/home/beyhan/.agents/skills/tauri-v2/SKILL.md` |
-| `vercel-react-best-practices` | React and Next.js performance optimization guidelines from Vercel Engineering. This skill should be used when writing, reviewing, or refactoring React/Next.js code to ensure optimal performance patterns. Triggers on tasks involving React components, Next.js pages, data fetching, bundle optimization, or performance improvements. | user | `/home/beyhan/.agents/skills/vercel-react-best-practices/SKILL.md` |
-| `work-unit-commits` | Plan commits as reviewable work units. Trigger: implementation, commit splitting, chained PRs, or keeping tests and docs with code. | user | `/home/beyhan/.config/opencode/skills/work-unit-commits/SKILL.md` |
+| `branch-pr` | Create Gentle AI pull requests with issue-first checks. Trigger: creating, opening, or preparing PRs for review. | user | `C:\Users\Beyhan\.config\opencode\skills\branch-pr\SKILL.md` |
+| `chained-pr` | Trigger: PRs over 400 lines, stacked PRs, review slices. Split oversized changes into chained PRs that protect review focus. | user | `C:\Users\Beyhan\.config\opencode\skills\chained-pr\SKILL.md` |
+| `cognitive-doc-design` | Design docs that reduce cognitive load. Trigger: writing guides, READMEs, RFCs, onboarding, architecture, or review-facing docs. | user | `C:\Users\Beyhan\.config\opencode\skills\cognitive-doc-design\SKILL.md` |
+| `comment-writer` | Write warm, direct collaboration comments. Trigger: PR feedback, issue replies, reviews, Slack messages, or GitHub comments. | user | `C:\Users\Beyhan\.config\opencode\skills\comment-writer\SKILL.md` |
+| `find-skills` | Helps users discover and install agent skills when they ask questions like "how do I do X", "find a skill for X", "is there a skill that can...", or express interest in extending capabilities. This skill should be used when the user is looking for functionality that might exist as an installable skill. | user | `C:\Users\Beyhan\.agents\skills\find-skills\SKILL.md` |
+| `go-testing` | Trigger: Go tests, go test coverage, Bubbletea teatest, golden files. Apply focused Go testing patterns. | user | `C:\Users\Beyhan\.config\opencode\skills\go-testing\SKILL.md` |
+| `issue-creation` | Create Gentle AI issues with issue-first checks. Trigger: creating GitHub issues, bug reports, or feature requests. | user | `C:\Users\Beyhan\.config\opencode\skills\issue-creation\SKILL.md` |
+| `judgment-day` | Trigger: judgment day, dual review, adversarial review, juzgar. Run explicit blind dual review with at most two scoped fix/re-judgment rounds. | user | `C:\Users\Beyhan\.config\opencode\skills\judgment-day\SKILL.md` |
+| `orca-cli` | Use the public `orca` CLI to operate Orca-managed worktrees, folder contexts, terminals, repos, automations, worktree comments, and the browser embedded inside the Orca app. Use when the user says "$orca-cli", "use orca cli", "Orca worktree", "child worktree", "cardStatus", "spawn codex/claude in a worktree", "read/wait/send Orca terminal", "terminal send", "full handoff", "handover", "give this to another agent", "another worktree", "Orca browser", or "control the browser inside Orca". Prefer this over raw `git worktree`, ad hoc PTYs, Playwright, or Computer Use when the task touches Orca-managed state. Use Computer Use for browser windows, webviews, or desktop UI outside Orca's embedded browser. | user | `C:\Users\Beyhan\.agents\skills\orca-cli\SKILL.md` |
+| `orchestration` | Use Orca orchestration for structured multi-agent coordination: threaded messages, blocking ask/reply flows, task dispatch, worker_done/escalation waits, task DAGs, decision gates, coordinator loops, or decomposing work across agents. Use `orca-cli` instead for full ownership handoffs, including requests phrased as "hand off", "handoff", "handover", "give this to another agent", or "another worktree" when the user did not explicitly ask to supervise, monitor, wait for results, or coordinate a DAG. Use `orca-cli` for ordinary terminal control, lightweight terminal prompts, shell commands, Orca worktree management, reading or waiting on terminals, and automation of the browser embedded inside Orca. Use Computer Use for browser windows, webviews, Orca app UI, or desktop UI outside Orca's embedded browser. | user | `C:\Users\Beyhan\.agents\skills\orchestration\SKILL.md` |
+| `skill-creator` | Trigger: new skills, agent instructions, documenting AI usage patterns. Create LLM-first skills with valid frontmatter. | user | `C:\Users\Beyhan\.config\opencode\skills\skill-creator\SKILL.md` |
+| `skill-improver` | Trigger: improve skills, audit skills, refactor skills, skill quality. Audit and upgrade existing LLM-first skills. | user | `C:\Users\Beyhan\.config\opencode\skills\skill-improver\SKILL.md` |
+| `work-unit-commits` | Plan commits as reviewable work units. Trigger: implementation, commit splitting, chained PRs, or keeping tests and docs with code. | user | `C:\Users\Beyhan\.config\opencode\skills\work-unit-commits\SKILL.md` |
 
 ## Loading protocol
 
