@@ -3,6 +3,7 @@
 mod commands;
 mod db;
 mod rclone;
+mod scheduler;
 mod state;
 
 use std::path::PathBuf;
