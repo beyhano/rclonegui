@@ -1,3 +1,18 @@
+# Task 6: Engine module — task execution wrapper
+
+**Files:**
+- Modify: `src-tauri/src/scheduler/engine.rs` (currently a stub from Task 5)
+
+**Interfaces:**
+- Consumes: `Task` struct from `task_repo.rs`, `rclone_path: &str`
+- Produces: `pub async fn execute_task(task: &Task, rclone_path: &str) -> Result<TaskResult, String>`
+  Where `TaskResult` has fields: `task_id`, `process_id`, `started_at`, `completed_at`, `success`, `error_message`, `progress`
+
+### Implementation
+
+Replace the stub in `src-tauri/src/scheduler/engine.rs` with:
+
+```rust
 use chrono::Utc;
 use serde::Serialize;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -77,7 +92,11 @@ pub async fn execute_task(
         error_message: if success { None } else { Some(error_lines.join("\n")) },
     })
 }
+```
 
+### Tests
+
+```rust
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,3 +134,19 @@ mod tests {
         assert!(result.is_err());
     }
 }
+```
+
+Note: We need `tokio::test` feature enabled in tokio. Check `Cargo.toml` — if `rt` and `macros` are already there, `tokio::test` should work. If not, update as needed.
+
+### Verification
+
+```bash
+cd src-tauri && cargo test scheduler::engine::tests -- --nocapture
+```
+Expected: Both tests PASS (verify error paths — the engine tries to spawn rclone with an invalid path).
+
+### Commit
+
+```bash
+git add -A && git commit -m "feat(scheduler): add engine module for task execution"
+```
