@@ -3,3 +3,4 @@ Task 2: complete (commits e68035ae..e88ad66, 12 tests pass, review not required 
 Task 3: complete (commit 25278d4, slug utility, 6 tests pass)
 Task 4: complete (commit e681d90, process-completed events fixed, cargo check passes)
 Task 5: complete (commit 0a037ff, cron parser, 5 tests pass)
+Task 6: complete (commit 93350ad, engine module, 2 tests pass)
