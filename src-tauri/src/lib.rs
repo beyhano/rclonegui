@@ -101,7 +101,7 @@ pub fn run() {
             app.manage(state);
 
             // Start the scheduler after a short delay to let Tauri init complete.
-            tokio::spawn(async move {
+            tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                 let guard = sched_for_start.lock().await;
                 if let Some(ref scheduler) = *guard {
