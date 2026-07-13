@@ -1,0 +1,58 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Project: rclonegui — Tauri v2 + React 19 + TypeScript 5.8 desktop GUI for rclone (rsync for cloud storage).
+  Stack: Rust 2021 edition backend (Tauri v2, serde, serde_json, tokio) + React 19 frontend (Vite 7, pnpm 11).
+  Architecture: Two-process Tauri architecture. Rust backend manages async rclone processes (tokio::process::Command),
+    tracks PIDs in Tauri State, parses stdout/stderr with regex, and emits progress events via app_handle.emit().
+    React frontend listens via @tauri-apps/api/event. Cross-platform (Windows & Linux).
+  Conventions: Zero unsafe code (#![deny(unsafe_code)]), cargo-only deps (cargo add, no manual Cargo.toml edits),
+    PathBuf for paths, platform-agnostic signal handling. Wiki docs at /docs/wiki/ (Obsidian format).
+  State: Scaffold stage — default Tauri template present, Belge/Prompt.md defines full requirements.
+  Persistence: hybrid (openspec + Engram).
+
+strict_tdd: true
+
+testing:
+  runner: cargo test
+  layers:
+    unit: true
+    integration: false
+    e2e: false
+  coverage: false
+  linter: cargo clippy
+  type_checker: tsc (via pnpm build)
+  formatter: cargo fmt
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Reference requirements from Belge/Prompt.md
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Relate each requirement to Belge/Prompt.md items
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - Reference docs/wiki/ architecture documents
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+  apply:
+    tdd: true
+    test_command: cargo test
+    guidelines:
+      - Zero unsafe code — #![deny(unsafe_code)] must stay active
+      - Use cargo add for new Rust deps, never edit Cargo.toml manually
+      - Cross-platform paths via std::path::PathBuf
+      - Use tokio::process::Command for async rclone execution
+      - Emit progress events via app_handle.emit()
+  verify:
+    test_command: cargo test
+    build_command: cargo build
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+    - Update docs/wiki/ if architecture changes

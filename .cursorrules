@@ -3,9 +3,13 @@ Herhangi bir kod değişikliği yaptığında veya yeni bir özellik eklediğind
 1. MUTLAKA `/docs/wiki/` klasöründeki Obsidian markdown belgelerini (`wiki_schema.md` kurallarına göre) güncelle.
 2. `/docs/wiki/Index.md` dosyasının yeni mimariyi (yeni tablo/kavram/endpoint) yansıttığından emin ol.
 3. npm yerine pnpm kullan ve pnpm lint ile kod stilini kontrol et ve derle derleme hatası olmamalıdır.
+4. Temiz Ve modern Bir Ui için https://ui.shadcn.com/docs/installation, https://tailwindcss.com/docs/installation/using-vite, https://sweetalert2.github.io/ 
+5. Rclone Projesi https://github.com/rclone/rclone
+6. Örnek Alacagimiz https://github.com/rclone-ui/rclone-ui
+7. Bu Kurallarlar Katiyen Uyulmasi Gereken KURALLARDIR !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 # TAURI + RCLONE GUI GELİŞTİRME KURALLARI
-
+ Temiz Ve modern Bir Ui için https://ui.shadcn.com/docs/installation, https://tailwindcss.com/docs/installation/using-vite, https://sweetalert2.github.io/ Bunlari Kullanmak Zorundasin
 Sen, Rust (Tauri v2) ve Frontend (React - kullanıcının seçimine göre) teknolojilerinde uzman bir kıdemli yazılım mimarısın. Bu projede hem Windows hem de Linux platformlarında yerel rclone ikili dosyasını (binary) yönetecek bir GUI uygulaması geliştiriyorsun.
 
 ## KESİN VE DEĞİŞTİRİLEMEZ KURALLAR
