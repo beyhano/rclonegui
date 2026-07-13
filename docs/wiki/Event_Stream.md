@@ -1,104 +1,92 @@
 # Event_Stream
 
-**Özet:** Rclone süreçlerinin stdout/stderr çıktısını regex ile ayrıştırarak Tauri event'leri (`emit`) ile frontend'e gerçek zamanlı ileten pipeline. **Henüz implemente edilmedi.**
+**Özet:** Rclone süreçlerinin stdout/stderr çıktısını regex ile ayrıştırarak Tauri event'leri (`emit`) ile frontend'e gerçek zamanlı ileten pipeline. Aktif ve çalışır durumdadır.
 
-**Kütüphaneler:** tokio (planlanan), regex (planlanan), serde, serde_json
+**Kütüphaneler:** tokio, regex, serde, serde_json
 
 **Bağlantılar:** [[Tauri_Backend]], [[Process_Manager]], [[React_Frontend]], [[Rclone_Integration]]
 
 ---
 
-## Planlanan Pipeline
+## Gerçekleşen Pipeline
+
+Proje dosyası: `src-tauri/src/rclone/events.rs`
 
 ```
-rclone stdout/stderr
+stdout/stderr (tokio::process::Command)
     │
     ▼
-AsyncReader (tokio::io::BufReader)
+BufReader (tokio::io::BufReader) — line-by-line
     │
     ▼
-Line Parser (her satırı regex ile eşleştir)
+parse_progress_line() — OnceLock<Regex> ile derlenmiş
     │
     ▼
-Event Payload (serde_json)
+app_handle.emit("rclone:progress", ProgressPayload)
     │
     ▼
-app_handle.emit("rclone:progress", payload)  →  Frontend listen()
+Frontend: listen("rclone:progress", callback)
 ```
 
-## Regex Desenleri
+## Regex Deseni
 
-Rclone'un ilerleme çıktısı (`--progress` flag'i ile) şu formattadır:
-
-```
-Transferred:   	  1.190 GiB / 1.190 GiB, 100%, 12.034 MiB/s, ETA 0s
-```
-
-Planlanan regex:
+Regex `OnceLock` içinde bir kere derlenir (lazy_static yerine Rust 1.80+ standardı):
 
 ```rust
-lazy_static! {
-    static ref PROGRESS_RE: Regex = Regex::new(
-        r"(?x)
-        Transferred:\s+
-        (?P<transferred>[\d.]+ \s* \w+)\s+/\s+
-        (?P<total>[\d.]+ \s* \w+),\s+
-        (?P<percent>\d+)%,\s+
-        (?P<speed>[\d.]+\s*\w+/s)
-        "
-    ).unwrap();
+use std::sync::OnceLock;
+
+fn progress_regex() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| {
+        Regex::new(
+            r"Transferred:\s+(?P<transferred>[\d.]+\s*\w*)\s+/\s+(?P<total>[\d.]+\s*\w*),\s+(?P<percent>\d+)%,\s+(?P<speed>[\d.]+\s*\w*/s)(?:,\s+ETA\s+(?P<eta>[\w\d-]+))?"
+        ).expect("invalid regex")
+    })
 }
 ```
+
+ETA alanı `[\w\d-]` ile genişletilmiştir — rclone bazen `ETA -` (bilinmiyor) döndürür.
 
 ## Event Payload'ları
 
+Events.rs'de tanımlı `ProgressPayload`:
+
 ```rust
 #[derive(Clone, Serialize)]
-struct ProgressPayload {
-    transferred: String,   // "1.190 GiB"
-    total: String,         // "1.190 GiB"
-    percent: u8,           // 100
-    speed: String,         // "12.034 MiB/s"
-    eta: String,           // "0s"
-}
-
-#[derive(Clone, Serialize)]
-struct ProcessEvent {
-    process_id: Uuid,
-    event_type: ProcessEventType,
-    message: Option<String>,
-}
-
-enum ProcessEventType {
-    Started,
-    Progress(ProgressPayload),
-    StdoutLine(String),
-    StderrLine(String),
-    Completed(i32),
-    Failed(String),
+pub struct ProgressPayload {
+    pub process_id: String,
+    pub transferred: String,
+    pub total: String,
+    pub percent: u8,
+    pub speed: String,
+    pub eta: String,
 }
 ```
 
-## Frontend'de Dinleme
+## Frontend'de Dinleme (TransferPanel.tsx)
 
 ```typescript
 import { listen } from "@tauri-apps/api/event";
 
-// Component mount'da
-const unlisten = await listen<RcloneProgress>("rclone:progress", (event) => {
-    setProgress(event.payload.percent);
-    setSpeed(event.payload.speed);
-});
-
-// Component unmount'da
-unlisten();
+useEffect(() => {
+    let cancelled = false;
+    const unlisten = listen<ProgressPayload>("rclone:progress", (event) => {
+        if (cancelled) return;
+        if (event.payload.process_id !== currentPidRef.current) return;
+        setProgress(event.payload.percent);
+        setSpeed(event.payload.speed);
+    });
+    return () => { cancelled = true; unlisten.then(fn => fn()); };
+}, []);
 ```
 
-## Event İsimlendirme Kuralı
+## Event Listesi
 
-Tüm event'ler `rclone:` namespace'i altında:
-- `rclone:progress` — ilerleme durumu
-- `rclone:process-started` — yeni süreç başladı
-- `rclone:process-completed` — süreç tamamlandı
-- `rclone:process-error` — hata durumu
-- `rclone:log` — genel log satırı
+| Event | Payload | Açıklama |
+|---|---|---|
+| `rclone:progress` | `ProgressPayload` | İlerleme yüzdesi, hız, ETA |
+| `rclone:process-started` | `{process_id}` | Yeni süreç başladı |
+| `rclone:process-completed` | `{process_id, exit_code}` | Süreç tamamlandı |
+| `rclone:process-error` | `{process_id, stderr_lines}` | Hata durumu |
+| `rclone:mount-status` | `{mount_id, status}` | Mount durum değişikliği |
+| `rclone:binary-missing` | `{platform}` | Binary bulunamadı |

@@ -1,31 +1,25 @@
 # Process_Manager
 
-**Özet:** Rclone süreçlerinin asenkron yaşam döngüsünü yöneten katman. `tokio::process::Command` ile süreçleri spawn eder, çıkış durumlarını izler ve temiz sonlandırma sağlar. **Henüz implemente edilmedi.**
+**Özet:** Rclone süreçlerinin asenkron yaşam döngüsünü yöneten katman. `tokio::process::Command` ile süreçleri spawn eder, çıkış durumlarını izler ve temiz sonlandırma sağlar. Aktif ve çalışır durumdadır.
 
-**Kütüphaneler:** tokio (planlanan), serde
+**Kütüphaneler:** tokio (process, io-util, sync), serde, uuid, chrono
 
 **Bağlantılar:** [[Tauri_Backend]], [[Rclone_Integration]], [[State_Management]], [[Event_Stream]]
 
 ---
 
-## Planlanan Mimari
+## Gerçekleşen Mimari
+
+Proje dosyası: `src-tauri/src/rclone/process.rs`
 
 ```rust
-use tokio::process::{Command, Child};
-use std::sync::Arc;
-use tokio::sync::Mutex;
-
-struct ProcessHandle {
-    child: Child,
-    pid: u32,
-    command: String,
-    started_at: chrono::DateTime<chrono::Utc>,
-}
-
-struct ProcessManager {
+pub struct ProcessManager {
     processes: Arc<Mutex<HashMap<Uuid, ProcessHandle>>>,
+    rclone_path: Arc<Mutex<Option<PathBuf>>>,
 }
 ```
+
+ProcessHandle `state.rs` içinde tanımlıdır, ProcessManager `process.rs` içinde.
 
 ## Yaşam Döngüsü
 

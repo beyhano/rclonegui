@@ -97,3 +97,8 @@ src-tauri/tauri.conf.json          → bundle.resources
 src/App.tsx                        → Tab router
 src/App.css                        → Yeni stiller
 ```
+
+## 8. Düzeltmeler
+
+- **Binary Discovery Fix**: `resource_dir()` yetmezse `find_binary()` fallback'i (CARGO_MANIFEST_DIR → cwd → exe ancestors)
+- **Wiki Güncelleme**: Tüm wiki sayfaları "plan" dilinden "aktif/gerçekleşen" durumuna güncellendi. 10 sayfada Özet/Kütüphaneler/Bağlantılar formatı korunuyor.

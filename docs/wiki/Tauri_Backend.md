@@ -1,6 +1,6 @@
 # Tauri_Backend
 
-**Özet:** Rust ile yazılmış Tauri v2 backend katmanı. Tauri komutlarını (`#[tauri::command]`) tanımlar, process yönetimini ve state'i bu katmanda barındırır. Şu an sadece `greet` komutu ile temel Tauri yapılandırması mevcuttur.
+**Özet:** Rust ile yazılmış Tauri v2 backend katmanı. 7 Tauri komutunu (`#[tauri::command]`) tanımlar, process yönetimini, SQLite veritabanını ve state'i bu katmanda barındırır. Tüm rclone entegrasyonu buradan yönetilir.
 
 **Kütüphaneler:** tauri 2, serde 1, serde_json 1, tauri-plugin-opener 2, tokio (planlanan)
 
@@ -17,11 +17,26 @@
 
 ## Mevcut Yapı
 
-- **`main.rs`**: `#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]` ile Windows konsol penceresini gizler; `rclonegui_lib::run()` çağırır.
-- **`lib.rs`**: `tauri::Builder::default()` ile uygulamayı başlatır:
-  - `tauri_plugin_opener::init()` (varsayılan Tauri plugin'i)
-  - `greet` komutu (geçici/should be replaced)
-- **`build.rs`**: `tauri_build::build()` — standart Tauri build script'i
+```
+src-tauri/src/
+├── main.rs                 → #![deny(unsafe_code)], windows_subsystem, giriş
+├── lib.rs                  → Tauri builder, setup, 7 komut, cleanup
+├── state.rs                → AppState (processes, db, mounts, rclone_path)
+├── commands/
+│   └── rclone_cmds.rs      → 7 #[tauri::command] fonksiyonu
+├── rclone/
+│   ├── discovery.rs        → Platform tespiti, binary bulma
+│   ├── process.rs          → ProcessManager (spawn, stop, cleanup_all)
+│   ├── events.rs           → Regex parser + event emit pipeline
+│   └── config.rs           → rclone config dump JSON parse
+└── db/
+    ├── migrations.rs       → create_tables (3 tablo)
+    └── models.rs           → CRUD operasyonları
+```
+
+- **`main.rs`**: `#![deny(unsafe_code)]` + `#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]`
+- **`lib.rs`**: `tauri::Builder::default()` ile 7 komut kaydı, SQLite init, binary discovery, cleanup on Exit
+- **`state.rs`**: `AppState` — `Mutex<HashMap<Uuid, ProcessHandle>>`, `Mutex<Connection>`, `Mutex<HashMap<Uuid, MountInfo>>`, `Mutex<Option<PathBuf>>`
 
 ## Tauri Yapılandırması
 
@@ -29,15 +44,23 @@
 - **Window**: 800×600, başlık "rclonegui"
 - **CSP**: `null` (dev mode)
 - **Permissions**: `core:default`, `opener:default`
+- **Bundle resources**: `rclone-bin/{platform}/rclone`(.exe) paketlenir
 
-## Planlanan Genişleme
+## Komut Listesi (7 adet)
 
-- Yeni `#[tauri::command]` fonksiyonları: `rclone_exec`, `rclone_stop`, `rclone_config_list`
-- [[Process_Manager]] için `tokio::process::Command` kullanımı
-- [[State_Management]] için `tauri::State` ile `Arc<Mutex<RcloneState>>`
-- [[Event_Stream]] için `app_handle.emit("progress", payload)`
+| Komut | İşlev |
+|---|---|
+| `rclone_version` | Binary versiyonu |
+| `rclone_config_list` | Remote listesi (config dump) |
+| `rclone_exec` | Rclone çalıştır + event stream |
+| `rclone_stop` | Process UUID ile durdur |
+| `rclone_mount` | Remote mount et |
+| `rclone_unmount` | Mount'ı çöz |
+| `rclone_mount_list` | Aktif mount'ları listele |
 
 ## Güvenlik
 
+- `#![deny(unsafe_code)]` tüm crate'lerde aktif
 - `capabilities/default.json` ile izin yönetimi
-- Gelecekte: rclone binary path'i güvenlik duvarından geçirilmeli
+- Binary yolu `find_binary()` ile çoklu katmanda güvenli aranır
+- Tüm `rusqlite` sorguları `params!` ile parametrize
