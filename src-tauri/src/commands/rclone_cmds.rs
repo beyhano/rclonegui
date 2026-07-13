@@ -323,9 +323,18 @@ mod tests {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let child = rt
             .block_on(async {
-                tokio::process::Command::new("echo")
-                    .arg("mount")
-                    .spawn()
+                #[cfg(not(target_os = "windows"))]
+                {
+                    tokio::process::Command::new("echo")
+                        .arg("mount")
+                        .spawn()
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    tokio::process::Command::new("cmd.exe")
+                        .args(["/c", "echo", "mount"])
+                        .spawn()
+                }
             })
             .expect("failed to spawn echo for mount test");
         let handle =

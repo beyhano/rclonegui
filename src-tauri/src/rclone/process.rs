@@ -170,9 +170,18 @@ mod tests {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let child = rt
             .block_on(async {
-                tokio::process::Command::new("echo")
-                    .arg("test")
-                    .spawn()
+                #[cfg(not(target_os = "windows"))]
+                {
+                    tokio::process::Command::new("echo")
+                        .arg("test")
+                        .spawn()
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    tokio::process::Command::new("cmd.exe")
+                        .args(["/c", "echo", "test"])
+                        .spawn()
+                }
             })
             .expect("failed to spawn echo");
         let handle = ProcessHandle::new(child, "echo test".to_string());
@@ -196,15 +205,23 @@ mod tests {
     fn test_spawn_echo_track_pid_stop_cleanup() {
         let processes: Arc<Mutex<HashMap<Uuid, ProcessHandle>>> =
             Arc::new(Mutex::new(HashMap::new()));
+        #[cfg(not(target_os = "windows"))]
         let rclone_path: Arc<Mutex<Option<PathBuf>>> =
             Arc::new(Mutex::new(Some(PathBuf::from("echo"))));
+        #[cfg(target_os = "windows")]
+        let rclone_path: Arc<Mutex<Option<PathBuf>>> =
+            Arc::new(Mutex::new(Some(PathBuf::from("cmd.exe"))));
         let pm = ProcessManager::new(processes.clone(), rclone_path);
 
         let rt = tokio::runtime::Runtime::new().unwrap();
 
         // Spawn echo via ProcessManager — the binary is "echo" with args
+        #[cfg(not(target_os = "windows"))]
+        let args = vec!["hello".to_string()];
+        #[cfg(target_os = "windows")]
+        let args = vec!["/c".to_string(), "echo".to_string(), "hello".to_string()];
         let id = rt
-            .block_on(pm.spawn(vec!["hello".to_string()]))
+            .block_on(pm.spawn(args))
             .expect("failed to spawn echo via ProcessManager");
 
         // Assert PID is tracked in the HashMap
@@ -213,7 +230,10 @@ mod tests {
             assert!(guard.contains_key(&id), "process should be in map");
             let handle = &guard[&id];
             assert!(handle.pid > 0, "PID should be > 0, got {}", handle.pid);
+            #[cfg(not(target_os = "windows"))]
             assert_eq!(handle.command, "echo hello");
+            #[cfg(target_os = "windows")]
+            assert_eq!(handle.command, "cmd.exe /c echo hello");
         }
 
         // Stop the process
