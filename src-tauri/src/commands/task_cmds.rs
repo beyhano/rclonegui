@@ -74,17 +74,17 @@ fn validate_task_input(
 
 /// List all tasks ordered by `created_at` descending.
 #[tauri::command]
-pub fn task_list(state: State<'_, AppState>) -> Result<Vec<Task>, String> {
-    let repo = state.task_repo.lock().map_err(|e| e.to_string())?;
+pub async fn task_list(state: State<'_, AppState>) -> Result<Vec<Task>, String> {
+    let repo = state.task_repo.lock().await;
     repo.list().map_err(|e| e.to_string())
 }
 
 /// Create a new task.
 ///
 /// Validates input, generates a unique slug, persists to the database,
-/// and (if the scheduler were wired) would add it to the scheduler.
+/// and notifies the scheduler so it can watch the new task.
 #[tauri::command]
-pub fn task_create(
+pub async fn task_create(
     state: State<'_, AppState>,
     name: String,
     source_provider: String,
@@ -123,8 +123,17 @@ pub fn task_create(
         updated_at: now,
     };
 
-    let repo = state.task_repo.lock().map_err(|e| e.to_string())?;
-    repo.create(&task).map_err(|e| e.to_string())?;
+    // DB write — synchronous, drop guard before scheduler await.
+    {
+        let repo = state.task_repo.lock().await;
+        repo.create(&task).map_err(|e| e.to_string())?;
+    }
+
+    // Notify the scheduler.
+    let sched = state.scheduler.lock().await;
+    if let Some(ref scheduler) = *sched {
+        scheduler.add_task(&task).await;
+    }
 
     Ok(task)
 }
@@ -132,9 +141,10 @@ pub fn task_create(
 /// Update an existing task.
 ///
 /// Preserves the original `created_at` timestamp. Does NOT update the
-/// `enabled` flag — use `task_toggle` for that.
+/// `enabled` flag — use `task_toggle` for that. Notifies the scheduler
+/// so its loop picks up the new configuration.
 #[tauri::command]
-pub fn task_update(
+pub async fn task_update(
     state: State<'_, AppState>,
     id: String,
     name: String,
@@ -155,60 +165,95 @@ pub fn task_update(
         &cron_expr,
     )?;
 
-    let repo = state.task_repo.lock().map_err(|e| e.to_string())?;
+    // DB read + update — synchronous, drop guard before await.
+    let task = {
+        let repo = state.task_repo.lock().await;
 
-    let existing = repo
-        .get_by_id(&id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| format!("Task not found: {}", id))?;
+        let existing = repo
+            .get_by_id(&id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("Task not found: {}", id))?;
 
-    let now = Utc::now().to_rfc3339();
+        let now = Utc::now().to_rfc3339();
 
-    let task = Task {
-        id,
-        name,
-        slug,
-        source_provider,
-        source_config,
-        dest_provider,
-        dest_config,
-        operation,
-        exclude_patterns,
-        cron_expr,
-        enabled: existing.enabled,
-        created_at: existing.created_at,
-        updated_at: now,
+        let task = Task {
+            id,
+            name,
+            slug,
+            source_provider,
+            source_config,
+            dest_provider,
+            dest_config,
+            operation,
+            exclude_patterns,
+            cron_expr,
+            enabled: existing.enabled,
+            created_at: existing.created_at,
+            updated_at: now,
+        };
+
+        repo.update(&task).map_err(|e| e.to_string())?;
+        task
     };
 
-    repo.update(&task).map_err(|e| e.to_string())?;
+    // Notify the scheduler.
+    let sched = state.scheduler.lock().await;
+    if let Some(ref scheduler) = *sched {
+        scheduler.update_task(&task).await;
+    }
 
     Ok(task)
 }
 
-/// Delete a task by its ID.
+/// Delete a task by its ID. Removes it from the scheduler if running.
 #[tauri::command]
-pub fn task_delete(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let repo = state.task_repo.lock().map_err(|e| e.to_string())?;
-    repo.delete(&id).map_err(|e| e.to_string())
+pub async fn task_delete(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    {
+        let repo = state.task_repo.lock().await;
+        repo.delete(&id).map_err(|e| e.to_string())?;
+    }
+
+    // Notify the scheduler.
+    let sched = state.scheduler.lock().await;
+    if let Some(ref scheduler) = *sched {
+        scheduler.remove_task(&id).await;
+    }
+
+    Ok(())
 }
 
 /// Toggle a task's `enabled` flag.
 ///
-/// If enabled, the runtime scheduler loop will execute it on its cron schedule.
-/// (Scheduler wiring is completed in a later task.)
+/// If enabled, the scheduler starts watching the task on its cron schedule.
+/// If disabled, the scheduler removes the task loop.
 #[tauri::command]
-pub fn task_toggle(state: State<'_, AppState>, id: String) -> Result<Task, String> {
-    let repo = state.task_repo.lock().map_err(|e| e.to_string())?;
+pub async fn task_toggle(state: State<'_, AppState>, id: String) -> Result<Task, String> {
+    // DB read + write — synchronous, drop guard before await.
+    let (task, is_now_enabled) = {
+        let repo = state.task_repo.lock().await;
 
-    let mut task = repo
-        .get_by_id(&id)
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| format!("Task not found: {}", id))?;
+        let mut task = repo
+            .get_by_id(&id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("Task not found: {}", id))?;
 
-    task.enabled = !task.enabled;
-    task.updated_at = Utc::now().to_rfc3339();
+        task.enabled = !task.enabled;
+        task.updated_at = Utc::now().to_rfc3339();
+        let is_now_enabled = task.enabled;
 
-    repo.update(&task).map_err(|e| e.to_string())?;
+        repo.update(&task).map_err(|e| e.to_string())?;
+        (task, is_now_enabled)
+    };
+
+    // Notify the scheduler.
+    let sched = state.scheduler.lock().await;
+    if let Some(ref scheduler) = *sched {
+        if is_now_enabled {
+            scheduler.add_task(&task).await;
+        } else {
+            scheduler.remove_task(&id).await;
+        }
+    }
 
     Ok(task)
 }

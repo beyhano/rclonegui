@@ -8,6 +8,8 @@ use serde::Serialize;
 use tokio::process::Child;
 use uuid::Uuid;
 
+use crate::scheduler::scheduler::TaskScheduler;
+
 /// A handle to a running rclone process.
 #[derive(Debug)]
 pub struct ProcessHandle {
@@ -44,17 +46,24 @@ pub struct AppState {
     pub rclone_path: Arc<Mutex<Option<PathBuf>>>,
     pub db: Arc<Mutex<Connection>>,
     pub mounts: Arc<Mutex<HashMap<Uuid, MountInfo>>>,
-    pub task_repo: Arc<Mutex<crate::db::task_repo::TaskRepo>>,
+    pub task_repo: Arc<tokio::sync::Mutex<crate::db::task_repo::TaskRepo>>,
+    /// Optional TaskScheduler for running scheduled transfer tasks on cron.
+    pub scheduler: Arc<tokio::sync::Mutex<Option<TaskScheduler>>>,
 }
 
 impl AppState {
-    pub fn new(db: Connection, task_repo: crate::db::task_repo::TaskRepo) -> Self {
+    pub fn new(
+        db: Connection,
+        task_repo: Arc<tokio::sync::Mutex<crate::db::task_repo::TaskRepo>>,
+        scheduler: Option<TaskScheduler>,
+    ) -> Self {
         Self {
             processes: Arc::new(Mutex::new(HashMap::new())),
             rclone_path: Arc::new(Mutex::new(None)),
             db: Arc::new(Mutex::new(db)),
             mounts: Arc::new(Mutex::new(HashMap::new())),
-            task_repo: Arc::new(Mutex::new(task_repo)),
+            task_repo,
+            scheduler: Arc::new(tokio::sync::Mutex::new(scheduler)),
         }
     }
 }
@@ -67,8 +76,10 @@ mod tests {
     #[test]
     fn test_app_state_creation() {
         let db = Connection::open_in_memory().unwrap();
-        let repo = TaskRepo::new(Connection::open_in_memory().unwrap());
-        let state = AppState::new(db, repo);
+        let repo = Arc::new(tokio::sync::Mutex::new(TaskRepo::new(
+            Connection::open_in_memory().unwrap(),
+        )));
+        let state = AppState::new(db, repo, None);
 
         assert!(state.processes.lock().unwrap().is_empty());
         assert!(state.rclone_path.lock().unwrap().is_none());
