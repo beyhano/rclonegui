@@ -44,6 +44,38 @@ pub fn create_tables(conn: &Connection) -> rusqlite::Result<()> {
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS tasks (
+            id              TEXT PRIMARY KEY,
+            name            TEXT NOT NULL,
+            slug            TEXT NOT NULL UNIQUE,
+            source_provider TEXT NOT NULL,
+            source_config   TEXT NOT NULL,
+            dest_provider   TEXT NOT NULL,
+            dest_config     TEXT NOT NULL,
+            operation       TEXT NOT NULL,
+            exclude_patterns TEXT NOT NULL DEFAULT '[]',
+            cron_expr       TEXT NOT NULL,
+            enabled         INTEGER NOT NULL DEFAULT 1,
+            created_at      TEXT NOT NULL,
+            updated_at      TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS transfers_v2 (
+            id            TEXT PRIMARY KEY,
+            remote_src    TEXT NOT NULL,
+            remote_dest   TEXT NOT NULL,
+            status        TEXT NOT NULL DEFAULT 'running',
+            progress      REAL DEFAULT 0.0,
+            speed         TEXT,
+            started_at    TEXT NOT NULL,
+            completed_at  TEXT,
+            error_message TEXT,
+            task_id       TEXT
+        );
+        INSERT OR IGNORE INTO transfers_v2 SELECT id, remote_src, remote_dest, status, progress, speed, started_at, completed_at, error_message, NULL as task_id FROM transfers;
+        DROP TABLE transfers;
+        ALTER TABLE transfers_v2 RENAME TO transfers;
         ",
     )
 }
@@ -100,12 +132,12 @@ mod tests {
     }
 
     #[test]
-    fn test_create_tables_all_three_tables_exist_via_pragma() {
+    fn test_create_tables_all_four_tables_exist_via_pragma() {
         let conn = Connection::open_in_memory().unwrap();
         create_tables(&conn).unwrap();
 
         // Use PRAGMA table_info to confirm each table has the expected structure
-        for table in &["transfers", "mounts", "app_config"] {
+        for table in &["transfers", "mounts", "app_config", "tasks"] {
             let mut stmt = conn
                 .prepare(&format!("PRAGMA table_info({table})"))
                 .unwrap();
@@ -128,12 +160,12 @@ mod tests {
 
         let table_count: i64 = conn
             .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('transfers', 'mounts', 'app_config')",
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('transfers', 'mounts', 'app_config', 'tasks')",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(table_count, 3, "all 3 tables should still exist after second call");
+        assert_eq!(table_count, 4, "all 4 tables should still exist after second call");
     }
 
     #[test]
@@ -153,8 +185,41 @@ mod tests {
             .filter_map(|r| r.ok())
             .collect();
 
-        assert_eq!(columns.len(), 9, "transfers should have 9 columns");
+        assert_eq!(columns.len(), 10, "transfers should have 10 columns (added task_id)");
         assert_eq!(columns[0], ("id".to_string(), "TEXT".to_string()));
         assert_eq!(columns[1], ("remote_src".to_string(), "TEXT".to_string()));
+    }
+
+    #[test]
+    fn test_create_tables_creates_tasks_table() {
+        let conn = Connection::open_in_memory().unwrap();
+        create_tables(&conn).unwrap();
+
+        let table_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='tasks'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(table_count, 1, "tasks table should exist");
+    }
+
+    #[test]
+    fn test_tasks_table_has_expected_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+        create_tables(&conn).unwrap();
+
+        let mut stmt = conn.prepare("PRAGMA table_info(tasks)").unwrap();
+        let columns: Vec<String> = stmt
+            .query_map([], |row| row.get::<_, String>(1))
+            .unwrap()
+            .filter_map(|r| r.ok())
+            .collect();
+
+        assert!(columns.contains(&"id".to_string()));
+        assert!(columns.contains(&"slug".to_string()));
+        assert!(columns.contains(&"cron_expr".to_string()));
+        assert!(columns.contains(&"enabled".to_string()));
     }
 }

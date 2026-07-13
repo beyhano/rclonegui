@@ -27,4 +27,5 @@ regex = "1.13.0"
 uuid = { version = "1.23.5", features = ["v4"] }
 chrono = { version = "0.4.45", features = ["serde"] }
 rusqlite = { version = "0.40.1", features = ["bundled"] }
+cron = "0.15"
 
