@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">"rclonegui"</string>
+    <string name="main_activity_title">"rclonegui"</string>
+</resources>

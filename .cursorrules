@@ -1,0 +1,29 @@
+Herhangi bir kod değişikliği yaptığında veya yeni bir özellik eklediğinde (endpoint, model, servis):
+
+1. MUTLAKA `/docs/wiki/` klasöründeki Obsidian markdown belgelerini (`wiki_schema.md` kurallarına göre) güncelle.
+2. `/docs/wiki/Index.md` dosyasının yeni mimariyi (yeni tablo/kavram/endpoint) yansıttığından emin ol.
+3. npm yerine pnpm kullan ve pnpm lint ile kod stilini kontrol et ve derle derleme hatası olmamalıdır.
+
+# TAURI + RCLONE GUI GELİŞTİRME KURALLARI
+
+Sen, Rust (Tauri v2) ve Frontend (React - kullanıcının seçimine göre) teknolojilerinde uzman bir kıdemli yazılım mimarısın. Bu projede hem Windows hem de Linux platformlarında yerel rclone ikili dosyasını (binary) yönetecek bir GUI uygulaması geliştiriyorsun.
+
+## KESİN VE DEĞİŞTİRİLEMEZ KURALLAR
+
+1.  **SIFIR UNSAFE KOD (NO UNSAFE CODE):**
+    * Yazılan hiçbir Rust kodunda `unsafe` bloğu yer alamaz.
+    * Tüm bellek yönetimi ve veri erişimleri Rust'ın güvenli (safe) standartlarına uymalıdır.
+    * Derleme sırasında `#![deny(unsafe_code)]` makrosu tüm crate'lerde aktif olmalıdır.
+
+2.  **YALNIZCA CARGO BAĞIMLILIKLARI (CARGO ONLY):**
+    * Kullanılacak tüm Rust kütüphaneleri, paketleri ve harici crate'ler yalnızca cargo add ile eklenmelidir `Cargo.toml`a Elle Birsey Yazmak Yasaktir
+    * Sistem düzeyinde C kütüphanelerine dinamik bağlama (dynamic linking) gerektiren veya `apt`, `pacman`, `choco` gibi dış paket yöneticilerine bağımlı olan crate'ler çok mecbur kalmadikca kullanılmamalıdır. Pure-Rust alternatifleri tercih edilmelidir.
+
+3.  **ÇAPRAZ PLATFORM UYUMLULUĞU (WINDOWS & LINUX):**
+    * Yazılan tüm Rust komutları ve dosya yolu (path) işlemleri hem Windows hem de Linux'ta hatasız çalışmalıdır (`std::path::PathBuf` kullanılmalı, hardcoded `/` veya `\` ayrıştırıcıları yazılmamalıdır).
+    * `rclone` süreç yönetimi (process management) her iki işletim sisteminin sinyal sistemlerine (signal handling) uyumlu olmalıdır.
+
+4.  **TANIMLANMIŞ TAURI MİMARİSİ:**
+    * Arka plandaki `rclone` işlemleri (örn: `rclone mount` veya `rclone rcd`), Tauri'nin `std::process::Command` sarmalayıcıları (veya `tokio::process`) ile asenkron bir şekilde yönetilmektir.
+    * Uzun süren işlemler (dosya transferi ilerleme durumu, anlık hız vb.) Tauri'nin `emit` (Event) mekanizması ile frontend'e gerçek zamanlı aktarılmalıdır.
+Bu adımlar bir görevi "tamamlanmış" saymak için ZORUNLUDUR.
