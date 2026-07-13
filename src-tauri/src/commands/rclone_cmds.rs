@@ -104,12 +104,25 @@ pub async fn rclone_exec(
         .insert(id, handle);
 
     // Spawn background event stream for stdout/stderr
-    start_event_stream(
+    let event_handle = start_event_stream(
         app.clone(),
         id,
         BufReader::new(stdout),
         BufReader::new(stderr),
     );
+
+    // Monitor when event stream finishes (process exited) → emit completion
+    let app_clone = app.clone();
+    let pid = id;
+    tokio::spawn(async move {
+        let _ = event_handle.await;
+        let _ = app_clone.emit(
+            "rclone:process-completed",
+            serde_json::json!({
+                "process_id": pid.to_string(),
+            }),
+        );
+    });
 
     let _ = app.emit(
         "rclone:process-started",
