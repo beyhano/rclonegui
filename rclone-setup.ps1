@@ -137,14 +137,14 @@ function Install-WslDeps {
     
     $oldEAP = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
-    wsl.exe -e dpkg -s libwebkit2gtk-4.1-dev libayatana-appindicator3-dev >$null 2>$null
+    wsl.exe -e dpkg -s libwebkit2gtk-4.1-dev libayatana-appindicator3-dev xdg-utils pkg-config patchelf >$null 2>$null
     $isInstalled = ($LASTEXITCODE -eq 0)
     $ErrorActionPreference = $oldEAP
 
     if (-not $isInstalled) {
         Write-Host "  -> Eksik paketler yukleniyor (sudo sifresi gerekebilir)..." -ForegroundColor Yellow
         wsl.exe -e sudo apt-get update
-        wsl.exe -e sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev
+        wsl.exe -e sudo apt-get install -y build-essential curl wget file pkg-config squashfs-tools libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev xdg-utils
     }
 }
 
