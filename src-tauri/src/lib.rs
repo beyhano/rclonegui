@@ -91,7 +91,7 @@ pub fn run() {
             // Grab a handle to the scheduler before it's moved into AppState.
             let scheduler_handle = scheduler;
 
-            let state = AppState::new(conn, task_repo, Some(scheduler_handle));
+            let state = AppState::new(task_repo, Some(scheduler_handle));
             if let Some(ref path) = rclone_path {
                 *state.rclone_path.lock().expect("lock rclone_path") = Some(path.clone());
             }
@@ -118,10 +118,7 @@ pub fn run() {
     app.run(|app_handle, event| {
         if let tauri::RunEvent::Exit = event {
             let state = app_handle.state::<AppState>();
-            let pm = ProcessManager::new(
-                state.processes.clone(),
-                state.rclone_path.clone(),
-            );
+            let pm = ProcessManager::new(state.processes.clone());
             let _ = pm.cleanup_all();
 
             // Stop the scheduler — take the Option so stop() runs only once.

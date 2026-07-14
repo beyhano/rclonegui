@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use chrono::{DateTime, Utc};
-use rusqlite::Connection;
 use serde::Serialize;
 use tokio::process::Child;
 use uuid::Uuid;
@@ -14,20 +12,11 @@ use crate::scheduler::scheduler::TaskScheduler;
 #[derive(Debug)]
 pub struct ProcessHandle {
     pub child: Child,
-    pub pid: u32,
-    pub command: String,
-    pub started_at: DateTime<Utc>,
 }
 
 impl ProcessHandle {
-    pub fn new(child: Child, command: String) -> Self {
-        let pid = child.id().unwrap_or(0);
-        Self {
-            child,
-            pid,
-            command,
-            started_at: Utc::now(),
-        }
+    pub fn new(child: Child) -> Self {
+        Self { child }
     }
 }
 
@@ -44,7 +33,6 @@ pub struct MountInfo {
 pub struct AppState {
     pub processes: Arc<Mutex<HashMap<Uuid, ProcessHandle>>>,
     pub rclone_path: Arc<Mutex<Option<PathBuf>>>,
-    pub db: Arc<Mutex<Connection>>,
     pub mounts: Arc<Mutex<HashMap<Uuid, MountInfo>>>,
     pub task_repo: Arc<tokio::sync::Mutex<crate::db::task_repo::TaskRepo>>,
     /// Optional TaskScheduler for running scheduled transfer tasks on cron.
@@ -53,14 +41,12 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(
-        db: Connection,
         task_repo: Arc<tokio::sync::Mutex<crate::db::task_repo::TaskRepo>>,
         scheduler: Option<TaskScheduler>,
     ) -> Self {
         Self {
             processes: Arc::new(Mutex::new(HashMap::new())),
             rclone_path: Arc::new(Mutex::new(None)),
-            db: Arc::new(Mutex::new(db)),
             mounts: Arc::new(Mutex::new(HashMap::new())),
             task_repo,
             scheduler: Arc::new(tokio::sync::Mutex::new(scheduler)),
@@ -75,11 +61,10 @@ mod tests {
 
     #[test]
     fn test_app_state_creation() {
-        let db = Connection::open_in_memory().unwrap();
         let repo = Arc::new(tokio::sync::Mutex::new(TaskRepo::new(
-            Connection::open_in_memory().unwrap(),
+            rusqlite::Connection::open_in_memory().unwrap(),
         )));
-        let state = AppState::new(db, repo, None);
+        let state = AppState::new(repo, None);
 
         assert!(state.processes.lock().unwrap().is_empty());
         assert!(state.rclone_path.lock().unwrap().is_none());
@@ -104,11 +89,8 @@ mod tests {
             }
         })
         .expect("failed to spawn echo");
-        let pid = child.id().expect("child process has no pid");
-        let handle = ProcessHandle::new(child, "echo test".to_string());
-
-        assert!(handle.pid > 0);
-        assert_eq!(handle.pid, pid);
-        assert_eq!(handle.command, "echo test");
+        let _handle = ProcessHandle::new(child);
+        // Just verify creation doesn't panic — removed pid/command/started_at fields
+        // use _handle.child if needed
     }
 }

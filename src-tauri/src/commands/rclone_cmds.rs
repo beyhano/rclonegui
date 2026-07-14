@@ -95,7 +95,7 @@ pub async fn rclone_exec(
 
     let id = Uuid::new_v4();
     let command_str = format!("{} {}", path.display(), args.join(" "));
-    let handle = ProcessHandle::new(child, command_str.clone());
+    let handle = ProcessHandle::new(child);
 
     state
         .processes
@@ -141,7 +141,7 @@ pub async fn rclone_stop(state: State<'_, AppState>, process_id: String) -> Resu
     let id =
         Uuid::parse_str(&process_id).map_err(|e| format!("Invalid process ID: {}", e))?;
 
-    let pm = ProcessManager::new(state.processes.clone(), state.rclone_path.clone());
+    let pm = ProcessManager::new(state.processes.clone());
     pm.stop(id).await
 }
 
@@ -176,8 +176,7 @@ pub async fn rclone_mount(
         .map_err(|e| format!("Failed to spawn rclone mount: {}", e))?;
 
     let id = Uuid::new_v4();
-    let command_str = format!("{} {}", path.display(), args.join(" "));
-    let handle = ProcessHandle::new(child, command_str);
+    let handle = ProcessHandle::new(child);
 
     state
         .processes
@@ -218,7 +217,7 @@ pub async fn rclone_unmount(state: State<'_, AppState>, mount_id: String) -> Res
         Uuid::parse_str(&mount_id).map_err(|e| format!("Invalid mount ID: {}", e))?;
 
     // Stop the underlying process
-    let pm = ProcessManager::new(state.processes.clone(), state.rclone_path.clone());
+    let pm = ProcessManager::new(state.processes.clone());
     pm.stop(id).await?;
 
     // Remove mount metadata
@@ -253,8 +252,7 @@ mod tests {
 
     #[test]
     fn test_get_rclone_path_none_returns_error() {
-        let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn, Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
+        let state = AppState::new(Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
         let result = get_rclone_path(&state);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "No rclone binary configured");
@@ -263,8 +261,7 @@ mod tests {
     #[test]
     fn test_rclone_version_without_binary_returns_error() {
         // rclone_version calls get_rclone_path first — verify error propagation
-        let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn, Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
+        let state = AppState::new(Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
         let result = get_rclone_path(&state);
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -276,8 +273,7 @@ mod tests {
 
     #[test]
     fn test_get_rclone_path_with_value() {
-        let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn, Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
+        let state = AppState::new(Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
         let path = PathBuf::from("/usr/local/bin/rclone");
         *state.rclone_path.lock().unwrap() = Some(path.clone());
         let result = get_rclone_path(&state);
@@ -287,16 +283,14 @@ mod tests {
 
     #[test]
     fn test_mount_list_empty_when_no_mounts() {
-        let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn, Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
+        let state = AppState::new(Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
         let guard = state.mounts.lock().unwrap();
         assert!(guard.is_empty());
     }
 
     #[test]
     fn test_mount_list_returns_stored_mounts() {
-        let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn, Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
+        let state = AppState::new(Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
         let mount = MountInfo {
             id: "test-id".into(),
             remote: "gdrive:".into(),
@@ -315,8 +309,7 @@ mod tests {
 
     #[test]
     fn test_mount_lifecycle_running_to_released() {
-        let conn = Connection::open_in_memory().unwrap();
-        let state = AppState::new(conn, Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
+        let state = AppState::new(Arc::new(tokio::sync::Mutex::new(TaskRepo::new(Connection::open_in_memory().unwrap()))), None);
         let mount_id = Uuid::new_v4();
 
         // Phase 1: Mount started — insert ProcessHandle + MountInfo
@@ -337,8 +330,7 @@ mod tests {
                 }
             })
             .expect("failed to spawn echo for mount test");
-        let handle =
-            ProcessHandle::new(child, "rclone mount gdrive: /mnt/gdrive".to_string());
+        let handle = ProcessHandle::new(child);
 
         let mount_info = MountInfo {
             id: mount_id.to_string(),
@@ -368,10 +360,7 @@ mod tests {
         }
 
         // Phase 3: Unmount — stop process and remove mount metadata
-        let pm = ProcessManager::new(
-            state.processes.clone(),
-            state.rclone_path.clone(),
-        );
+        let pm = ProcessManager::new(state.processes.clone());
         rt.block_on(pm.stop(mount_id))
             .expect("failed to stop mount process");
         state.mounts.lock().unwrap().remove(&mount_id);

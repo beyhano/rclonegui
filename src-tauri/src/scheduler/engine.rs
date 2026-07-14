@@ -4,7 +4,6 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use uuid::Uuid;
 
 pub use crate::db::task_repo::Task;
-use crate::rclone::events::{parse_progress_line, ProgressPayload};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct TaskResult {

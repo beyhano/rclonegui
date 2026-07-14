@@ -64,7 +64,6 @@ pub async fn config_list(rclone_path: &Path) -> Result<Vec<Remote>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_remote_serialization() {

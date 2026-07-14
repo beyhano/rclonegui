@@ -72,45 +72,6 @@ pub fn locate_binary(base_path: &Path, platform: &str) -> PathBuf {
     path
 }
 
-/// Verify the binary at `path` exists and has execute permissions.
-///
-/// On Unix, checks the executable bit (`mode & 0o111`).
-/// On Windows, checks for `.exe` extension.
-pub fn verify_executable(path: &Path) -> Result<(), String> {
-    if !path.exists() {
-        return Err(format!("Binary not found: {}", path.display()));
-    }
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let metadata =
-            std::fs::metadata(path).map_err(|e| format!("Failed to read metadata: {}", e))?;
-        let mode = metadata.permissions().mode();
-        if mode & 0o111 == 0 {
-            return Err(format!(
-                "Binary found but is not executable: {}",
-                path.display()
-            ));
-        }
-    }
-
-    #[cfg(windows)]
-    {
-        match path.extension() {
-            Some(ext) if ext == "exe" => {}
-            _ => {
-                return Err(format!(
-                    "Binary must have .exe extension: {}",
-                    path.display()
-                ));
-            }
-        }
-    }
-
-    Ok(())
-}
-
 /// Search for the bundled rclone binary across multiple locations.
 ///
 /// Returns the path if found in any known location, or `None` if not found.
@@ -279,38 +240,4 @@ mod tests {
         assert_eq!(path, expected);
     }
 
-    // -- verify_executable tests --
-
-    #[test]
-    fn test_verify_executable_path_not_found() {
-        let path = Path::new("/tmp/nonexistent_rclone_binary");
-        let result = verify_executable(path);
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("not found"));
-    }
-
-    #[test]
-    fn test_verify_executable_not_executable() {
-        let tmp = std::env::temp_dir().join("test_rclone_not_exec");
-        // Clean up from previous runs
-        let _ = std::fs::remove_file(&tmp);
-        std::fs::write(&tmp, b"not an executable").unwrap();
-
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o644)).unwrap();
-        }
-
-        let result = verify_executable(&tmp);
-
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(
-            err.contains("not executable") || err.contains(".exe extension"),
-            "Expected error about permissions or extension, got: {err}"
-        );
-
-        let _ = std::fs::remove_file(&tmp);
-    }
 }

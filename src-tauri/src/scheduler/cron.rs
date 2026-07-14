@@ -13,26 +13,6 @@ pub fn next_cron_time(expr: &str) -> Result<Option<DateTime<Utc>>, String> {
     }
 }
 
-/// Format the duration until the next run as a human-readable string.
-pub fn format_next_run(expr: &str) -> Result<String, String> {
-    match next_cron_time(expr)? {
-        Some(dt) => {
-            let now = Utc::now();
-            let duration = dt.signed_duration_since(now);
-            if duration.num_seconds() < 60 {
-                Ok("in less than a minute".to_string())
-            } else if duration.num_minutes() < 60 {
-                Ok(format!("in {} minutes", duration.num_minutes()))
-            } else if duration.num_hours() < 24 {
-                Ok(format!("in {} hours", duration.num_hours()))
-            } else {
-                Ok(format!("in {} days", duration.num_days()))
-            }
-        }
-        None => Ok("no upcoming run".to_string()),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -55,15 +35,4 @@ mod tests {
         assert!(result.is_some());
     }
 
-    #[test]
-    fn test_format_next_run() {
-        let result = format_next_run("0 0 1 1 * *").unwrap();
-        assert!(result.contains("in") || result.contains("no upcoming"));
-    }
-
-    #[test]
-    fn test_invalid_format_returns_error() {
-        let result = format_next_run("");
-        assert!(result.is_err());
-    }
 }

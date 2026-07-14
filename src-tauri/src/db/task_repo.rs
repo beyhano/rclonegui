@@ -77,6 +77,7 @@ impl TaskRepo {
     }
 
     /// Get a single task by its unique slug.
+    #[allow(dead_code)]
     pub fn get_by_slug(&self, slug: &str) -> Result<Option<Task>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, name, slug, source_provider, source_config, dest_provider, \

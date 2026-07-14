@@ -222,7 +222,6 @@ impl TaskScheduler {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::db::task_repo::Task;
 
     fn sample_task() -> Task {
