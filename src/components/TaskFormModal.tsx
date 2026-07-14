@@ -18,9 +18,24 @@ interface TaskFormData {
 interface Props {
   onClose: () => void;
   onCreated: (task: Task) => void;
+  editTask?: Task;
 }
 
-export default function TaskFormModal({ onClose, onCreated }: Props) {
+function parsePath(fullPath: string): { remote: string; path: string } {
+  if (/^[A-Za-z]:[\\/]/.test(fullPath)) {
+    return { remote: "local", path: fullPath };
+  }
+  const colonIdx = fullPath.indexOf(":");
+  if (colonIdx > 0) {
+    return {
+      remote: fullPath.slice(0, colonIdx),
+      path: fullPath.slice(colonIdx + 1),
+    };
+  }
+  return { remote: "local", path: fullPath };
+}
+
+export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
   const [step, setStep] = useState(1);
   const [remotes, setRemotes] = useState<Remote[]>([]);
   const [form, setForm] = useState<TaskFormData>({
@@ -34,6 +49,24 @@ export default function TaskFormModal({ onClose, onCreated }: Props) {
   useEffect(() => {
     invoke<Remote[]>("rclone_config_list").then(setRemotes).catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (editTask) {
+      const src = parsePath(editTask.source_provider);
+      const dst = parsePath(editTask.dest_provider);
+      setForm({
+        name: editTask.name,
+        slug: editTask.slug,
+        source: src.remote,
+        source_path: src.path,
+        dest: dst.remote,
+        dest_path: dst.path,
+        operation: editTask.operation,
+        exclude_patterns: editTask.exclude_patterns,
+        cron_expr: editTask.cron_expr,
+      });
+    }
+  }, [editTask]);
 
   const updateName = (name: string) => {
     setForm(f => ({ ...f, name, slug: generateSlug(name) }));
@@ -59,16 +92,32 @@ export default function TaskFormModal({ onClose, onCreated }: Props) {
     setSubmitting(true);
     setError("");
     try {
-      const task = await invoke<Task>("task_create", {
-        name: form.name,
-        sourceProvider: sourceFull,
-        sourceConfig: "{}",
-        destProvider: destFull,
-        destConfig: "{}",
-        operation: form.operation,
-        excludePatterns: form.exclude_patterns,
-        cronExpr: form.cron_expr,
-      });
+      let task: Task;
+      if (editTask) {
+        task = await invoke<Task>("task_update", {
+          id: editTask.id,
+          name: form.name,
+          slug: form.slug,
+          sourceProvider: sourceFull,
+          sourceConfig: "{}",
+          destProvider: destFull,
+          destConfig: "{}",
+          operation: form.operation,
+          excludePatterns: form.exclude_patterns,
+          cronExpr: form.cron_expr,
+        });
+      } else {
+        task = await invoke<Task>("task_create", {
+          name: form.name,
+          sourceProvider: sourceFull,
+          sourceConfig: "{}",
+          destProvider: destFull,
+          destConfig: "{}",
+          operation: form.operation,
+          excludePatterns: form.exclude_patterns,
+          cronExpr: form.cron_expr,
+        });
+      }
       onCreated(task);
       onClose();
     } catch (e) {
@@ -106,7 +155,7 @@ export default function TaskFormModal({ onClose, onCreated }: Props) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <h2>New Task — Step {step}/3</h2>
+        <h2>{editTask ? `Edit Task — Step ${step}/3` : `New Task — Step ${step}/3`}</h2>
         
         {step === 1 && (
           <div className="modal-step">
@@ -157,7 +206,7 @@ export default function TaskFormModal({ onClose, onCreated }: Props) {
             <button onClick={() => setStep(s => s + 1)} disabled={!canProceed()}>Next</button>
           ) : (
             <button onClick={handleSubmit} disabled={submitting}>
-              {submitting ? "Creating..." : "Create Task"}
+              {submitting ? "Saving..." : editTask ? "Update Task" : "Create Task"}
             </button>
           )}
           <button onClick={onClose}>Cancel</button>

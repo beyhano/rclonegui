@@ -8,6 +8,7 @@ import { Task } from "../types";
 export default function SchedulerPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editTask, setEditTask] = useState<Task | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [runningTasks, setRunningTasks] = useState<Set<string>>(new Set());
   const [taskProgress, setTaskProgress] = useState<Record<string, { percent: number; speed: string; eta: string }>>({});
@@ -72,7 +73,7 @@ export default function SchedulerPage() {
     <div className="scheduler-page">
       <div className="scheduler-header">
         <h2>Scheduled Tasks</h2>
-        <button onClick={() => setShowForm(true)}>+ New Task</button>
+        <button onClick={() => { setEditTask(undefined); setShowForm(true); }}>+ New Task</button>
       </div>
       {tasks.length === 0 ? (
         <div className="empty-state">
@@ -82,11 +83,17 @@ export default function SchedulerPage() {
       ) : (
         <div className="task-list">
           {tasks.map(task => (
-            <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onRunNow={handleRunNow} isRunning={runningTasks.has(task.id)} progress={runningTasks.has(task.id) ? Object.values(taskProgress)[0] : undefined} />
+            <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onRunNow={handleRunNow} onEdit={(t) => setEditTask(t)} isRunning={runningTasks.has(task.id)} progress={runningTasks.has(task.id) ? Object.values(taskProgress)[0] : undefined} />
           ))}
         </div>
       )}
-      {showForm && <TaskFormModal onClose={() => setShowForm(false)} onCreated={() => loadTasks()} />}
+      {showForm && (
+        <TaskFormModal
+          onClose={() => { setShowForm(false); setEditTask(undefined); }}
+          onCreated={() => loadTasks()}
+          editTask={editTask}
+        />
+      )}
     </div>
   );
 }

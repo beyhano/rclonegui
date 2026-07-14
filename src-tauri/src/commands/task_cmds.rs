@@ -118,7 +118,7 @@ pub async fn task_create(
         operation,
         exclude_patterns,
         cron_expr,
-        enabled: false,
+        enabled: true,
         created_at: now.clone(),
         updated_at: now,
     };
