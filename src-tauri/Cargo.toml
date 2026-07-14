@@ -29,4 +29,5 @@ chrono = { version = "0.4.45", features = ["serde"] }
 rusqlite = { version = "0.40.1", features = ["bundled"] }
 cron = "0.15"
 tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2"
 

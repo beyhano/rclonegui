@@ -19,6 +19,7 @@ param(
     [switch]$TauriBuild,
     [switch]$BuildLinux,
     [switch]$Release,
+    [switch]$Publish,
     [string]$RcloneVersion = "current"
 )
 
@@ -210,34 +211,22 @@ function Publish-Release {
         return
     }
 
-    # once build
-    Push-Location $RepoRoot
-    try {
-        Write-Host "  -> pnpm install + pnpm build" -ForegroundColor Gray
-        pnpm install 2>&1 | Out-Null
-        pnpm build 2>&1 | Out-Null
-        Write-Host "  -> cargo tauri build" -ForegroundColor Gray
-        cargo tauri build 2>&1 | Out-Null
-    } catch {
-        Write-Host "  [XX] Build hatasi" -ForegroundColor Red
-        Pop-Location; return
+    # build-dist klasorunu ve icindeki paketleri kontrol et
+    $distDir = Join-Path $RepoRoot "build-dist"
+    $assets = @()
+    if (Test-Path $distDir) {
+        $assets = Get-ChildItem $distDir -Filter "rclonegui*" | Select-Object -ExpandProperty FullName
     }
-    Pop-Location
+
+    if ($assets.Count -eq 0) {
+        Write-Host "  [XX] build-dist/ icinde yuklenecek rclonegui paketi bulunamadi!" -ForegroundColor Red
+        Write-Host "       Once .\rclone-setup.ps1 -TauriBuild ve/veya -BuildLinux calistirin." -ForegroundColor Yellow
+        return
+    }
 
     # tag at
     git tag $tag 2>$null
     git push origin $tag 2>$null
-
-    # bundle'leri topla
-    $bundleDir = Join-Path $RepoRoot "src-tauri\target\release\bundle"
-    $assets = @()
-    $assets += Get-ChildItem (Join-Path $bundleDir "msi") -Filter "*.msi" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-    $assets += Get-ChildItem (Join-Path $bundleDir "nsis") -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-
-    if ($assets.Count -eq 0) {
-        Write-Host "  [XX] Bundle bulunamadi: $bundleDir" -ForegroundColor Red
-        return
-    }
 
     Write-Host "  -> gh release create $tag" -ForegroundColor Gray
     $arg = @("release", "create", $tag, "--title", "rclonegui $version", "--notes", "rclonegui $version")
@@ -247,6 +236,59 @@ function Publish-Release {
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n  [OK] Release olusturuldu!" -ForegroundColor Green
         Write-Host "  https://github.com/beyhano/rclonegui/releases/tag/$tag" -ForegroundColor White
+    }
+}
+
+function Publish-Git {
+    Write-Host "`n=== GitHub CI/CD Release ===" -ForegroundColor Cyan
+    $version = Get-Version
+    $tag = "v$version"
+    Write-Host "  Surum: $version -> Etiket: $tag" -ForegroundColor Gray
+
+    # Commit mesaji iste
+    $defaultMsg = "release: $tag"
+    Write-Host "  Commit mesaji girin (Bos birakirsaniz '$defaultMsg' kullanilacak):" -ForegroundColor Yellow
+    $msg = Read-Host
+    if ([string]::IsNullOrWhiteSpace($msg)) {
+        $msg = $defaultMsg
+    }
+
+    # Git islemleri
+    Write-Host "  -> git add ." -ForegroundColor Gray
+    git add .
+    
+    Write-Host "  -> git commit -m '$msg'" -ForegroundColor Gray
+    git commit -m $msg
+    
+    Write-Host "  -> git push origin main" -ForegroundColor Gray
+    git push origin main
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [XX] Git push basarisiz oldu!" -ForegroundColor Red
+        return
+    }
+
+    Write-Host "  -> git tag $tag" -ForegroundColor Gray
+    git tag $tag 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        # Eger etiket zaten varsa ezmek isteyip istemedigini sor
+        Write-Host "  [!] $tag etiketi zaten mevcut. Yeniden olusturulsun mu? (Y = evet, N = hayir)" -ForegroundColor Yellow
+        $overwriteTag = Read-Host
+        if ($overwriteTag -eq "Y" -or $overwriteTag -eq "y") {
+            git tag -d $tag 2>$null
+            git push origin --delete $tag 2>$null
+            git tag $tag
+        } else {
+            Write-Host "  [XX] Islem iptal edildi." -ForegroundColor Red
+            return
+        }
+    }
+
+    Write-Host "  -> git push origin $tag" -ForegroundColor Gray
+    git push origin $tag
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "`n  [OK] GitHub Actions tetiklendi! Derleme sureci GitHub uzerinden takip edilebilir." -ForegroundColor Green
+    } else {
+        Write-Host "  [XX] Etiket pushlanirken hata olustu!" -ForegroundColor Red
     }
 }
 
@@ -260,13 +302,15 @@ if ($Download)   { Download-Binaries }
 if ($TauriBuild) { Build-Tauri }
 if ($BuildLinux) { Build-Linux }
 if ($Release)    { Publish-Release }
+if ($Publish)    { Publish-Git }
 
-if (-not $Check -and -not $Download -and -not $TauriBuild -and -not $BuildLinux -and -not $Release) {
+if (-not $Check -and -not $Download -and -not $TauriBuild -and -not $BuildLinux -and -not $Release -and -not $Publish) {
     $version = Get-Version
     Write-Host "  Surum: $version`n" -ForegroundColor Gray
     Write-Host "  .\rclone-setup.ps1 -Check          # Binary kontrol" -ForegroundColor Gray
     Write-Host "  .\rclone-setup.ps1 -Download       # rclone indir" -ForegroundColor Gray
     Write-Host "  .\rclone-setup.ps1 -TauriBuild     # Installer uret (.msi)" -ForegroundColor Gray
     Write-Host "  .\rclone-setup.ps1 -BuildLinux     # WSL ile Linux binary" -ForegroundColor Gray
-    Write-Host "  .\rclone-setup.ps1 -Release        # Build + GitHub Release" -ForegroundColor Gray
+    Write-Host "  .\rclone-setup.ps1 -Release        # Yerel GitHub Release" -ForegroundColor Gray
+    Write-Host "  .\rclone-setup.ps1 -Publish        # Otomatik GitHub Actions Release (CI/CD)" -ForegroundColor Gray
 }
