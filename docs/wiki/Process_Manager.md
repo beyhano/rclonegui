@@ -1,6 +1,6 @@
 # Process_Manager
 
-**Özet:** Rclone süreçlerinin asenkron yaşam döngüsünü yöneten katman. `tokio::process::Command` ile süreçleri spawn eder, çıkış durumlarını izler ve temiz sonlandırma sağlar. Aktif ve çalışır durumdadır.
+**Özet:** Rclone süreçlerinin asenkron yaşam döngüsünü yöneten katman. `tokio::process::Command` ile süreçleri spawn eder, çıkış durumlarını izler ve temiz sonlandırma sağlar. Hem manuel transfer/mount süreçleri hem de scheduler task süreçleri için iki farklı kill mekanizması kullanılır.
 
 **Kütüphaneler:** tokio (process, io-util, sync), serde, uuid, chrono
 
@@ -15,11 +15,8 @@ Proje dosyası: `src-tauri/src/rclone/process.rs`
 ```rust
 pub struct ProcessManager {
     processes: Arc<Mutex<HashMap<Uuid, ProcessHandle>>>,
-    rclone_path: Arc<Mutex<Option<PathBuf>>>,
 }
 ```
-
-ProcessHandle `state.rs` içinde tanımlıdır, ProcessManager `process.rs` içinde.
 
 ## Yaşam Döngüsü
 
@@ -28,16 +25,28 @@ Başlat → Spawn(rclone komutu) → PID kaydet [[State_Management]]
    │
    ├── stdout/stderr → Event_Stream pipeline'ı
    │
-   ├── Kullanıcı "Durdur" → kill(child.id()) → cleanup
+   ├── Kullanıcı "Durdur" → ProcessManager::stop(id) → child.start_kill()
    │
-   ├── Process exit → durumu güncelle → event emit
+   ├── Scheduler task stop → taskkill/kill -9 (PID tabanlı)
    │
-   └── Uygulama kapanıyor → tüm child process'leri temizle
+   ├── Process exit → rclone:process-completed event emit
+   │
+   └── Uygulama kapanıyor
+       ├── ProcessManager.cleanup_all() → state.processes.clear()
+       ├── task_pids → taskkill/kill -9 ile tüm scheduler PID'leri öldür
+       └── scheduler.stop() → cancel_tokens ile cron döngüleri durdur
 ```
+
+## İki Farklı Kill Mekanizması
+
+| Yöntem | Kullanım Yeri | Mekanizma |
+|---|---|---|
+| `ProcessManager::stop()` | `rclone_stop`, `rclone_unmount` | `ProcessHandle`'ı map'ten kaldır → `kill_on_drop(true)` ile child sonlanır |
+| `task_stop` | `task_cmds.rs::task_stop` | `state.task_pids[id]`'den PID al → `taskkill /F` / `kill -9` |
 
 ## Temel İşlemler
 
-### Süreç Başlatma
+### Süreç Başlatma (ProcessManager)
 
 ```rust
 pub async fn spawn(&self, args: &[String]) -> Result<Uuid> {
@@ -47,28 +56,70 @@ pub async fn spawn(&self, args: &[String]) -> Result<Uuid> {
         .stderr(Stdio::piped())
         .kill_on_drop(true)  // ÖNEMLİ: Tauri kapandığında child'ı da öldür
         .spawn()?;
-    
-    // PID'i state'e kaydet
-    // stdout/stderr reader task'larını başlat → [[Event_Stream]]
 }
+```
+
+### Scheduler Task Başlatma (engine.rs)
+
+```rust
+let mut child = tokio::process::Command::new(rclone_path)
+    .args(&args)
+    .kill_on_drop(true)
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()?;
+
+// PID tracking — task_stop komutuyla PID üzerinden öldürme
+let pid = child.id().unwrap_or(0);
+state.task_pids.lock().await.insert(task.id.clone(), pid);
 ```
 
 ### Süreç Durdurma
 
-- `child.start_kill()` ile gracefull shutdown dene
-- Timeout sonrası `child.kill()` ile zorla sonlandır
-- Zombie process'leri önlemek için wait() çağır
+- **ProcessManager.stop(uuid)**: `ProcessHandle`'ı map'ten kaldır → `kill_on_drop(true)` trigger
+- **task_stop(id)**: `state.task_pids[id]` → PID bul → platform-agnostik kill
+  - Windows: `taskkill /PID {pid} /F`
+  - Unix: `kill -9 {pid}`
+
+### PID Tabanlı Kill (task_stop / Exit cleanup)
+
+```rust
+#[cfg(windows)]
+tokio::process::Command::new("taskkill")
+    .args(&["/PID", &pid.to_string(), "/F"])
+    .output().await?;
+
+#[cfg(not(windows))]
+tokio::process::Command::new("kill")
+    .arg("-9")
+    .arg(pid.to_string())
+    .output().await?;
+```
 
 ### Uygulama Kapanışı
 
-Tauri'nin `on_window_event` veya `RunEvent::Exit` handler'ı içinde:
-1. Tüm `ProcessHandle`'ları dolaş
-2. Her birine start_kill() gönder
-3. Kısa timeout bekle
-4. Kalanları kill() ile temizle
+Exit handler'da üç aşamalı cleanup:
+
+```rust
+// 1. ProcessManager — state.processes'teki tüm rclone child'ları temizle
+let pm = ProcessManager::new(state.processes.clone());
+let _ = pm.cleanup_all();
+
+// 2. task_pids — scheduler task PID'lerini platform kill ile öldür
+for pid in pids_to_kill {
+    taskkill /PID {pid} /F  // veya kill -9
+}
+task_pids.lock().await.clear();
+
+// 3. Scheduler — cron döngülerini durdur
+if let Some(scheduler) = guard.take() {
+    scheduler.stop().await;
+}
+```
 
 ## Platform Notları
 
-- **Linux**: `SIGTERM` → `SIGKILL` sırası
-- **Windows**: `taskkill /PID` veya `Child::kill()`
+- **Linux**: `SIGKILL` (`kill -9`)
+- **Windows**: `taskkill /PID /F`
 - Tokio'nun `kill_on_drop(true)` özelliği her iki platformda da çalışır
+- PID tabanlı kill (`taskkill`/`kill -9`) scheduler task'leri için kullanılır — ProcessHandle'a erişim gerekmez

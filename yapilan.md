@@ -59,9 +59,10 @@
   - `rclone_version`, `rclone_config_list`, `rclone_exec`, `rclone_stop`
   - `rclone_mount`, `rclone_unmount`, `rclone_mount_list`
   - `rclone_config_create` — remote oluşturma
-- **`commands/task_cmds.rs`** — 7 komut:
-  - `task_list`, `task_create`, `task_update`, `task_delete`, `task_toggle`, `task_run_now`
+- **`commands/task_cmds.rs`** — 9 komut:
+  - `task_list`, `task_create`, `task_update`, `task_delete`, `task_toggle`, `task_run_now`, `task_stop`
   - `rclone_providers` — rclone backend listesi
+  - `task_running_list` — anlık çalışan task PID'leri
 
 ### Sistem Tray (src-tauri/src/tray.rs)
 - Tray icon + menu (Show Window, Quit)
@@ -80,7 +81,7 @@
 
 ### Task Scheduler UI
 - **`SchedulerPage.tsx`** — Görev listesi, ekle/düzenle/sil/çalıştır, progress takibi
-- **`TaskCard.tsx`** — Görev kartı (ad, schedule, operation, progress bar, Edit/Run/Toggle/Delete)
+- **`TaskCard.tsx`** — Görev kartı (ad, schedule, operation, progress bar, Edit/Run/Toggle/Stop/Delete)
 - **`TaskFormModal.tsx`** — 3-step wizard (ad+slug → kaynak/hedef path → operation+exclude+cron)
 - **`ConfigFormModal.tsx`** — 2-step remote ekleme (provider seç → parametre gir)
 - **`ProviderSelector.tsx`** — rclone backend seçme dropdown
@@ -116,6 +117,10 @@
 - **Windows test fix**: echo built-in → `cmd.exe /c echo`
 - **Wiki Güncelleme**: Tüm wiki sayfaları güncellendi
 - **Task edit fix**: Edit butonu showForm=true yapmıyordu, düzeltildi
+- **PID tracking fix**: task_pids (task_id → PID) ile çalışan task'lar takip ediliyor, kapatınca/stop'ta öldürülüyor
+- **Exclude fix**: `--delete-excluded` kaldırıldı, sadece `--exclude` ile yüklemeyi engelle
+- **Stop button**: ⏹ Stop butonu — taskkill/PID ile process sonlandırma
+- **Tab switch fix**: Scheduler sekmeye geri dönünce `task_running_list` ile çalışan task'lar geri yükleniyor
 
 ## 9. Değişen / Eklenen Dosyalar
 

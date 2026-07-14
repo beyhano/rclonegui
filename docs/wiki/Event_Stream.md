@@ -1,6 +1,6 @@
 # Event_Stream
 
-**Özet:** Rclone süreçlerinin stdout/stderr çıktısını regex ile ayrıştırarak Tauri event'leri (`emit`) ile frontend'e gerçek zamanlı ileten pipeline. Aktif ve çalışır durumdadır.
+**Özet:** Rclone süreçlerinin stdout/stderr çıktısını regex ile ayrıştırarak Tauri event'leri (`emit`) ile frontend'e gerçek zamanlı ileten pipeline. Hem manuel `rclone_exec` süreçleri hem de scheduler engine tarafından başlatılan task süreçleri aynı event mekanizmasını kullanır.
 
 **Kütüphaneler:** tokio, regex, serde, serde_json
 
@@ -10,22 +10,39 @@
 
 ## Gerçekleşen Pipeline
 
-Proje dosyası: `src-tauri/src/rclone/events.rs`
+**Proje dosyası**: `src-tauri/src/rclone/events.rs`
+**Scheduler engine**: `src-tauri/src/scheduler/engine.rs`
+
+### Manuel Süreç (rclone_exec)
 
 ```
 stdout/stderr (tokio::process::Command)
     │
     ▼
-BufReader (tokio::io::BufReader) — line-by-line
+start_event_stream() → BufReader line-by-line
+    │
+    ├── parse_progress_line() → match → emit("rclone:progress", ProgressPayload)
+    │
+    └── no match → emit("rclone:log", { process_id, line })
     │
     ▼
-parse_progress_line() — OnceLock<Regex> ile derlenmiş
+event_handle.await → emit("rclone:process-completed", { process_id })
+```
+
+### Scheduler Task Süreci (execute_task)
+
+```
+stdout → BufReader → parse_progress_line() → match → emit("rclone:progress")
+stderr → BufReader → emit("rclone:log")
     │
     ▼
-app_handle.emit("rclone:progress", ProgressPayload)
+child.wait() → exit code
     │
-    ▼
-Frontend: listen("rclone:progress", callback)
+    ├── success → DB'ye transfers kaydı (status: "completed")
+    │           → emit("task:completed", { task_id, task_name, ... })
+    │
+    └── error   → DB'ye transfers kaydı (status: "error")
+                → emit("task:error", { task_id, error, ... })
 ```
 
 ## Regex Deseni
@@ -49,7 +66,7 @@ ETA alanı `[\w\d-]` ile genişletilmiştir — rclone bazen `ETA -` (bilinmiyor
 
 ## Event Payload'ları
 
-Events.rs'de tanımlı `ProgressPayload`:
+### ProgressPayload (`events.rs`)
 
 ```rust
 #[derive(Clone, Serialize)]
@@ -62,6 +79,33 @@ pub struct ProgressPayload {
     pub eta: String,
 }
 ```
+
+### TaskResult (`engine.rs`)
+
+```rust
+#[derive(Debug, Clone, Serialize)]
+pub struct TaskResult {
+    pub task_id: String,
+    pub process_id: String,
+    pub started_at: String,
+    pub completed_at: Option<String>,
+    pub success: bool,
+    pub error_message: Option<String>,
+}
+```
+
+## Event Listesi (9 adet)
+
+| Event | Payload | Açıklama |
+|---|---|---|
+| `rclone:progress` | `ProgressPayload` | İlerleme yüzdesi, hız, ETA |
+| `rclone:process-started` | `{process_id, command}` | Yeni süreç başladı |
+| `rclone:process-completed` | `{process_id}` | Süreç tamamlandı (exit sonrası) |
+| `rclone:mount-status` | `{mount_id, status}` | Mount durum değişikliği |
+| `rclone:log` | `{process_id, line}` | stdout/stderr log satırı |
+| `rclone:binary-missing` | `{platform}` | Binary bulunamadı |
+| `task:completed` | `{task_id, task_name, started_at, completed_at}` | Task başarılı |
+| `task:error` | `{task_id, task_name, error}` | Task hatası |
 
 ## Frontend'de Dinleme (TransferPanel.tsx)
 
@@ -79,14 +123,3 @@ useEffect(() => {
     return () => { cancelled = true; unlisten.then(fn => fn()); };
 }, []);
 ```
-
-## Event Listesi
-
-| Event | Payload | Açıklama |
-|---|---|---|
-| `rclone:progress` | `ProgressPayload` | İlerleme yüzdesi, hız, ETA |
-| `rclone:process-started` | `{process_id}` | Yeni süreç başladı |
-| `rclone:process-completed` | `{process_id, exit_code}` | Süreç tamamlandı |
-| `rclone:process-error` | `{process_id, stderr_lines}` | Hata durumu |
-| `rclone:mount-status` | `{mount_id, status}` | Mount durum değişikliği |
-| `rclone:binary-missing` | `{platform}` | Binary bulunamadı |

@@ -1,8 +1,8 @@
 # State_Management
 
-**Özet:** Çalışan rclone süreçlerinin ve uygulama durumunun Tauri'nin `State` yapısı ile yönetimi. SQLite bağlantısı ve mount listesi de state içinde tutulur. Aktif ve çalışır durumdadır.
+**Özet:** Çalışan rclone süreçlerinin, uygulama durumunun, task repository'sinin, scheduler'ın ve task PID'lerinin Tauri'nin `State` yapısı ile yönetimi. SQLite bağlantısı ve mount listesi de state içinde tutulur.
 
-**Kütüphaneler:** serde, tokio, rusqlite, uuid, chrono
+**Kütüphaneler:** serde, tokio, rusqlite, uuid, chrono, cron
 
 **Bağlantılar:** [[Tauri_Backend]], [[Process_Manager]], [[Rclone_Integration]], [[Architecture_Overview]]
 
@@ -20,15 +20,19 @@ Proje dosyası: `src-tauri/src/state.rs`
 pub struct AppState {
     pub processes: Arc<Mutex<HashMap<Uuid, ProcessHandle>>>,
     pub rclone_path: Arc<Mutex<Option<PathBuf>>>,
-    pub db: Arc<Mutex<Connection>>,
     pub mounts: Arc<Mutex<HashMap<Uuid, MountInfo>>>,
+    pub task_repo: Arc<tokio::sync::Mutex<TaskRepo>>,
+    pub scheduler: Arc<tokio::sync::Mutex<Option<TaskScheduler>>>,
+    pub task_pids: Arc<tokio::sync::Mutex<HashMap<String, u32>>>,
 }
 ```
 
-- **`processes`**: Çalışan rclone süreçleri (PID + Child handle)
-- **`rclone_path`**: Keşfedilen binary yolu (setup'ta belirlenir)
-- **`db`**: SQLite bağlantısı (Rusqlite bundled)
-- **`mounts`**: Aktif mount'lar (remote + mount_point + status)
+- **`processes`**: Çalışan rclone süreçleri (PID + Child handle) — `std::sync::Mutex`
+- **`rclone_path`**: Keşfedilen binary yolu (setup'ta belirlenir) — `std::sync::Mutex`
+- **`mounts`**: Aktif mount'lar (remote + mount_point + status) — `std::sync::Mutex`
+- **`task_repo`**: Görev veritabanı repository'si — `tokio::sync::Mutex` (async CRUD için)
+- **`scheduler`**: Cron-tabanlı görev zamanlayıcı (opsiyonel) — `tokio::sync::Mutex`
+- **`task_pids`**: Scheduler tarafından çalıştırılan task process'lerinin PID haritası (task_id → PID) — `tokio::sync::Mutex`
 
 ## State'i Kaydetme
 
@@ -36,22 +40,22 @@ State, `lib.rs` içinde `setup()` callback'inde oluşturulur:
 
 ```rust
 .setup(|app| {
-    let conn = Connection::open(&db_path)?;
-    db::migrations::create_tables(&conn)?;
-    let state = AppState::new(conn);
-    if let Some(ref path) = rclone_path {
-        *state.rclone_path.lock().unwrap() = Some(path.clone());
-    }
+    let task_repo = Arc::new(tokio::sync::Mutex::new(TaskRepo::new(conn)));
+    let scheduler = TaskScheduler::new(task_repo.clone(), rclone_path_arc, app.handle().clone());
+    let state = AppState::new(task_repo, Some(scheduler));
     app.manage(state);
+    tray::build_tray(app.handle())?;
+    // scheduler.start() async spawn
     Ok(())
 })
 ```
 
 ## Thread Güvenliği
 
-- Tüm alanlar `Arc<Mutex<T>>` ile korunur
-- `std::sync::Mutex` tercih edilir — kısa kilitlenmeler için async maliyeti gerekmez
-- Her Tauri komutu kendi async context'inde state'e erişir
+- `processes`, `rclone_path`, `mounts`: `std::sync::Mutex` — kısa kilitlenmeler için async maliyeti gerekmez
+- `task_repo`, `scheduler`, `task_pids`: `tokio::sync::Mutex` — async context'te .await içeren işlemler için
+- Tüm alanlar `Arc<T>` ile çoklu task/thread arasında paylaşılır
+- task_cmds handler'ları DB lock'u bırakıp scheduler await çağırır — deadlock önlenir
 
 ## Frontend State
 
