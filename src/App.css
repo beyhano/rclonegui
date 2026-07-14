@@ -531,6 +531,36 @@ button {
   background-color: #e0e0e0;
 }
 
+.remote-browser-modal {
+  min-width: 80% !important;
+  max-width: 450px !important;
+}
+.directory-list {
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+.directory-item {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid #eee;
+  transition: background 0.15s;
+  color: #0f0f0f;
+}
+.directory-item.up {
+  font-weight: bold;
+}
+.directory-item:hover {
+  background: #f0f0f0;
+}
+
+.checkbox-input {
+  width: auto !important;
+  height: auto !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
 @media (prefers-color-scheme: dark) {
   .task-card { border-color: #444; background: #1e1e1e; }
   .progress-bar-bg { background: #444; }
@@ -559,5 +589,20 @@ button {
   }
   .btn-browse:hover {
     background-color: #444444 !important;
+  }
+
+  .directory-list {
+    background-color: #333333 !important;
+    border-color: #555555 !important;
+  }
+  .directory-item {
+    color: #eeeeee !important;
+    border-bottom-color: #444444 !important;
+  }
+  .directory-item:hover {
+    background: #444444 !important;
+  }
+  .directory-item.up {
+    background: #2a2a2a !important;
   }
 }

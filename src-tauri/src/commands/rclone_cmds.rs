@@ -271,6 +271,51 @@ pub async fn rclone_config_create(
     Ok(())
 }
 
+/// List directories of a remote or local path via `rclone lsf --dirs-only --dir-slash=false`.
+#[tauri::command]
+pub async fn rclone_list_dirs(
+    state: State<'_, AppState>,
+    remote: String,
+    path: String,
+) -> Result<Vec<String>, String> {
+    let rclone_path = get_rclone_path(&state)?;
+
+    let remote_arg = if remote == "local" {
+        path.clone()
+    } else {
+        if path.is_empty() {
+            format!("{}:", remote)
+        } else {
+            format!("{}:{}", remote, path)
+        }
+    };
+
+    let output = tokio::process::Command::new(&rclone_path)
+        .arg("lsf")
+        .arg("--dirs-only")
+        .arg("--dir-slash=false")
+        .arg(&remote_arg)
+        .output()
+        .await
+        .map_err(|e| format!("Failed to list directories: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Listing failed: {}", stderr));
+    }
+
+    let stdout = String::from_utf8(output.stdout)
+        .map_err(|e| format!("Non-UTF-8 output: {}", e))?;
+
+    let dirs: Vec<String> = stdout
+        .lines()
+        .map(|s| s.to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    Ok(dirs)
+}
+
 // ----- Task 4.4 RED test: rclone_config_list error path -----
 
 #[cfg(test)]

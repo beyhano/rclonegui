@@ -46,6 +46,11 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [browsingRemote, setBrowsingRemote] = useState<{
+    remote: string;
+    path: string;
+    onSelect: (path: string) => void;
+  } | null>(null);
 
   useEffect(() => {
     invoke<Remote[]>("rclone_config_list").then(setRemotes).catch(console.error);
@@ -133,16 +138,24 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
     setRemote: (v: string) => void; setPath: (v: string) => void;
   }) => {
     const handleBrowse = async () => {
-      try {
-        const selected = await open({
-          directory: true,
-          multiple: false,
-        });
-        if (selected && typeof selected === "string") {
-          setPath(selected);
+      if (remote === "local") {
+        try {
+          const selected = await open({
+            directory: true,
+            multiple: false,
+          });
+          if (selected && typeof selected === "string") {
+            setPath(selected);
+          }
+        } catch (err) {
+          console.error("Browse failed:", err);
         }
-      } catch (err) {
-        console.error("Browse failed:", err);
+      } else {
+        setBrowsingRemote({
+          remote,
+          path,
+          onSelect: setPath,
+        });
       }
     };
 
@@ -163,11 +176,9 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
             placeholder={remote === "local" ? "C:\\Users\\... or /home/..." : "subfolder (optional)"}
             className="path-input"
           />
-          {remote === "local" && (
-            <button type="button" onClick={handleBrowse} className="btn-browse" title="Browse local directory">
-              📂
-            </button>
-          )}
+          <button type="button" onClick={handleBrowse} className="btn-browse" title={`Browse ${remote === "local" ? "local" : "remote"} directory`}>
+            📂
+          </button>
         </div>
         <code className="path-preview">{buildFullPath(remote, path) || "—"}</code>
       </div>
@@ -231,6 +242,116 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
               {submitting ? "Saving..." : editTask ? "Update Task" : "Create Task"}
             </button>
           )}
+          <button onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+
+      {browsingRemote && (
+        <RemoteBrowserModal
+          remote={browsingRemote.remote}
+          initialPath={browsingRemote.path}
+          onClose={() => setBrowsingRemote(null)}
+          onSelect={browsingRemote.onSelect}
+        />
+      )}
+    </div>
+  );
+}
+
+interface RemoteBrowserModalProps {
+  remote: string;
+  initialPath: string;
+  onClose: () => void;
+  onSelect: (path: string) => void;
+}
+
+function RemoteBrowserModal({ remote, initialPath, onClose, onSelect }: RemoteBrowserModalProps) {
+  const [path, setPath] = useState(initialPath);
+  const [dirs, setDirs] = useState<string[]>([]);
+  const [showHidden, setShowHidden] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const loadDirs = async (currentPath: string) => {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await invoke<string[]>("rclone_list_dirs", {
+        remote,
+        path: currentPath,
+      });
+      setDirs(result);
+      setPath(currentPath);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDirs(initialPath);
+  }, [remote, initialPath]);
+
+  const navigateTo = (sub: string) => {
+    const nextPath = path ? `${path}/${sub}` : sub;
+    loadDirs(nextPath);
+  };
+
+  const goUp = () => {
+    if (!path) return;
+    const parts = path.split("/");
+    parts.pop();
+    const nextPath = parts.join("/");
+    loadDirs(nextPath);
+  };
+
+  const filteredDirs = dirs.filter(d => showHidden || !d.startsWith("."));
+
+  return (
+    <div className="modal-overlay" style={{ zIndex: 200 }} onClick={onClose}>
+      <div className="modal remote-browser-modal" onClick={e => e.stopPropagation()}>
+        <h3>Browse Remote: {remote}</h3>
+        <div className="path-display" style={{ margin: "0.5rem 0", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <span>Path:</span>
+          <code className="path-preview" style={{ flex: 1 }}>{path || "/"}</code>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: "0.5rem 0" }}>
+          <input
+            type="checkbox"
+            id="show-hidden"
+            checked={showHidden}
+            onChange={e => setShowHidden(e.target.checked)}
+            className="checkbox-input"
+          />
+          <label htmlFor="show-hidden" style={{ cursor: "pointer", fontSize: "0.9rem" }}>Show hidden folders</label>
+        </div>
+
+        {loading && <p style={{ padding: "1rem", textAlign: "center" }}>Loading directories...</p>}
+        {error && <p className="error" style={{ padding: "1rem 0" }}>{error}</p>}
+
+        {!loading && !error && (
+          <div className="directory-list" style={{ maxHeight: "250px", overflowY: "auto", margin: "1rem 0" }}>
+            {path && (
+              <div className="directory-item up" onClick={goUp}>
+                📁 .. (Go Up)
+              </div>
+            )}
+            {filteredDirs.length === 0 ? (
+              <div style={{ padding: "1rem", color: "#888", textAlign: "center" }}>No subdirectories found</div>
+            ) : (
+              filteredDirs.map(d => (
+                <div key={d} className="directory-item" onClick={() => navigateTo(d)}>
+                  📁 {d}
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        <div className="modal-actions" style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+          <button className="btn-primary" onClick={() => { onSelect(path); onClose(); }}>Select Folder</button>
           <button onClick={onClose}>Cancel</button>
         </div>
       </div>
