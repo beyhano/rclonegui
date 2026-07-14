@@ -40,7 +40,7 @@ function Copy-BundlesToDist {
     }
     $bundleDir = Join-Path $RepoRoot "src-tauri\target\release\bundle"
     if (Test-Path $bundleDir) {
-        $bundles = Get-ChildItem $bundleDir -Recurse -Include "*.msi","*.exe","*.deb","*.AppImage"
+        $bundles = Get-ChildItem $bundleDir -Recurse -Include "rclonegui*"
         if ($bundles) {
             Write-Host "`n  Bundle ciktilari kopyalaniyor (build-dist/):" -ForegroundColor Cyan
             foreach ($b in $bundles) {
