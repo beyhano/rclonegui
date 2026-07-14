@@ -34,9 +34,6 @@ pub async fn execute_task(
         args.push("--exclude".to_string());
         args.push(pattern.clone());
     }
-    if !task.exclude_patterns.is_empty() {
-        args.push("--delete-excluded".to_string());
-    }
     args.push("--progress".to_string());
 
     let mut child = tokio::process::Command::new(rclone_path)
