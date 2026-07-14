@@ -80,7 +80,7 @@ impl TaskScheduler {
     /// Run a task immediately, bypassing the schedule.
     pub async fn run_now(&self, task: &Task) {
         let rclone_path = self.rclone_path.read().await.clone().unwrap_or_default();
-        let result = execute_task(task, &rclone_path).await;
+        let result = execute_task(task, &rclone_path, Some(&self.app)).await;
         let app = self.app.clone();
         match result {
             Ok(task_result) => {
@@ -170,7 +170,7 @@ impl TaskScheduler {
                         if already_running { continue; }
 
                         let path = rclone_path.read().await.clone().unwrap_or_default();
-                        let result = execute_task(&task_clone, &path).await;
+                        let result = execute_task(&task_clone, &path, Some(&app)).await;
 
                         match result {
                             Ok(task_result) => {

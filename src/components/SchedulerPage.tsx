@@ -9,6 +9,8 @@ export default function SchedulerPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [runningTasks, setRunningTasks] = useState<Set<string>>(new Set());
+  const [taskProgress, setTaskProgress] = useState<Record<string, { percent: number; speed: string; eta: string }>>({});
 
   const loadTasks = () => {
     invoke<Task[]>("task_list")
@@ -21,7 +23,27 @@ export default function SchedulerPage() {
     loadTasks();
     const unlisten1 = listen("task:completed", () => loadTasks());
     const unlisten2 = listen("task:error", () => loadTasks());
-    return () => { unlisten1.then(f => f()); unlisten2.then(f => f()); };
+    const unlistenProgress = listen("rclone:progress", (event: any) => {
+      const payload = event.payload;
+      setTaskProgress(prev => ({ ...prev, [payload.process_id]: { percent: payload.percent, speed: payload.speed, eta: payload.eta } }));
+    });
+    const unlistenStarted = listen("rclone:process-started", (event: any) => {
+      console.log("process started:", event.payload);
+    });
+    const unlistenCompleted = listen("rclone:process-completed", (event: any) => {
+      setTaskProgress(prev => {
+        const next = { ...prev };
+        delete next[(event.payload as any).process_id];
+        return next;
+      });
+    });
+    return () => {
+      unlisten1.then(f => f());
+      unlisten2.then(f => f());
+      unlistenProgress.then(f => f());
+      unlistenStarted.then(f => f());
+      unlistenCompleted.then(f => f());
+    };
   }, []);
 
   const handleToggle = async (id: string) => {
@@ -35,8 +57,13 @@ export default function SchedulerPage() {
   };
 
   const handleRunNow = async (id: string) => {
-    await invoke("task_run_now", { id });
-    loadTasks();
+    setRunningTasks(prev => new Set(prev).add(id));
+    try {
+      await invoke("task_run_now", { id });
+    } finally {
+      loadTasks();
+      setRunningTasks(prev => { const n = new Set(prev); n.delete(id); return n; });
+    }
   };
 
   if (loading) return <div className="scheduler-page"><p>Loading tasks...</p></div>;
@@ -55,7 +82,7 @@ export default function SchedulerPage() {
       ) : (
         <div className="task-list">
           {tasks.map(task => (
-            <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onRunNow={handleRunNow} />
+            <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onRunNow={handleRunNow} isRunning={runningTasks.has(task.id)} progress={runningTasks.has(task.id) ? Object.values(taskProgress)[0] : undefined} />
           ))}
         </div>
       )}
