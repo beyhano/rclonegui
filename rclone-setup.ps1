@@ -163,7 +163,7 @@ function Build-Linux {
         Write-Host "     Devam? (Enter = evet, N = hayir)" -ForegroundColor Yellow
         $confirm = Read-Host
         if ($confirm -ne "N" -and $confirm -ne "n") {
-            wsl.exe -e bash -l -c "cd '$wslPath' && cargo tauri build"
+            wsl.exe -e bash -l -c "cd '$wslPath' && pnpm tauri build"
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "`n  [OK] Bundle olusturuldu!" -ForegroundColor Green
                 Write-Host "     $wslPath/src-tauri/target/release/bundle/" -ForegroundColor White
