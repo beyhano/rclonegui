@@ -43,6 +43,7 @@ pub fn run() {
             commands::task_cmds::task_stop,
             commands::task_cmds::task_running_list,
             commands::task_cmds::rclone_providers,
+            commands::rclone_cmds::rclone_selfupdate,
         ])
         .setup(|app| {
             // Initialize SQLite database in the app data directory
@@ -59,7 +60,7 @@ pub fn run() {
             // Locate the bundled rclone binary — try resource_dir (production),
             // then fall back to CARGO_MANIFEST_DIR, cwd, and exe ancestors (dev).
             let platform = rclone::discovery::resolve_platform();
-            let rclone_path: Option<PathBuf> = app
+            let bundled_path: Option<PathBuf> = app
                 .path()
                 .resource_dir()
                 .ok()
@@ -71,6 +72,11 @@ pub fn run() {
                     None
                 })
                 .or_else(|| rclone::discovery::find_binary(platform));
+
+            // Copy bundled binary to app_data on first run so it's writable for self-updates.
+            let rclone_path: Option<PathBuf> = bundled_path.and_then(|bundled| {
+                rclone::discovery::ensure_app_binary(&bundled, &app_dir, platform).ok()
+            });
 
             // Create task repo behind Arc<Mutex> so it can be shared with the scheduler.
             let task_conn =

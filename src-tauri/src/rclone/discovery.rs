@@ -19,6 +19,11 @@
 /// 2. CARGO_MANIFEST_DIR parent — when env var is set (dev/build time)
 /// 3. Current working directory — `pwd/rclone-bin/{platform}/`
 /// 4. Ancestors of current executable — walk up from binary path
+///
+/// # App Data Binary
+///
+/// `ensure_app_binary()` copies the bundled binary to the app data directory
+/// on first run. This writable copy is used for self-updates via `rclone selfupdate`.
 use std::path::{Path, PathBuf};
 
 /// Resolve the host platform to a platform identifier string.
@@ -120,6 +125,50 @@ pub fn find_binary(platform: &str) -> Option<PathBuf> {
     }
 
     None
+}
+
+/// Ensure the rclone binary exists in the app data directory.
+///
+/// If the binary does not exist at `app_data_dir/rclone-bin/{platform}/{binary}`,
+/// it is copied from `bundled_path`. Returns the path to the app data binary.
+///
+/// This ensures a writable copy is available for self-updates without needing
+/// elevated privileges (Program Files, /usr, etc. are often read-only).
+pub fn ensure_app_binary(
+    bundled_path: &Path,
+    app_data_dir: &Path,
+    platform: &str,
+) -> Result<PathBuf, String> {
+    let target_dir = app_data_dir.join("rclone-bin").join(platform_folder(platform));
+    let target_path = target_dir.join(binary_name(platform));
+
+    if target_path.exists() {
+        return Ok(target_path);
+    }
+
+    // Bundled binary must exist
+    if !bundled_path.exists() {
+        return Err(format!(
+            "Bundled rclone binary not found at: {}",
+            bundled_path.display()
+        ));
+    }
+
+    std::fs::create_dir_all(&target_dir)
+        .map_err(|e| format!("Failed to create app data rclone dir: {}", e))?;
+
+    std::fs::copy(bundled_path, &target_path)
+        .map_err(|e| format!("Failed to copy rclone binary to app data: {}", e))?;
+
+    // Make executable on Unix
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&target_path, std::fs::Permissions::from_mode(0o755))
+            .map_err(|e| format!("Failed to set executable permission: {}", e))?;
+    }
+
+    Ok(target_path)
 }
 
 // ----- RED tests first (Task 2.4) -----
@@ -243,5 +292,70 @@ mod tests {
         expected.push("osx-amd64");
         expected.push("rclone");
         assert_eq!(path, expected);
+    }
+
+    // -- ensure_app_binary tests --
+
+    #[test]
+    fn test_ensure_app_binary_existing() {
+        let dir = std::env::temp_dir().join(format!("rclonegui-test-{}", std::process::id()));
+        let platform = resolve_platform();
+        let bin_name = binary_name(platform);
+        let folder = platform_folder(platform);
+
+        // Seed the target path so it "already exists"
+        let target_dir = dir.join("app_data").join("rclone-bin").join(folder);
+        std::fs::create_dir_all(&target_dir).expect("create target dir");
+        std::fs::write(target_dir.join(bin_name), b"fake-rclone").expect("write target");
+
+        let bundled = Path::new("/nonexistent/bundled/rclone"); // shouldn't be read
+        let result = ensure_app_binary(bundled, &dir.join("app_data"), platform);
+        assert!(result.is_ok(), "should succeed when target exists: {:?}", result);
+        let path = result.unwrap();
+        assert!(path.ends_with(bin_name), "should end with binary name");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_ensure_app_binary_copies() {
+        let dir = std::env::temp_dir().join(format!("rclonegui-test-{}", std::process::id()));
+        let platform = resolve_platform();
+        let bin_name = binary_name(platform);
+        let folder = platform_folder(platform);
+
+        // Create a fake bundled binary
+        let bundled_dir = dir.join("bundled").join("rclone-bin").join(folder);
+        std::fs::create_dir_all(&bundled_dir).expect("create bundled dir");
+        let bundled_path = bundled_dir.join(bin_name);
+        std::fs::write(&bundled_path, b"real-rclone-content").expect("write bundled");
+
+        let app_data = dir.join("app_data");
+        let result = ensure_app_binary(&bundled_path, &app_data, platform);
+        assert!(result.is_ok(), "copy should succeed: {:?}", result);
+        let target = result.unwrap();
+        assert!(target.exists(), "target should exist after copy");
+        assert_eq!(
+            std::fs::read(&target).expect("read target"),
+            b"real-rclone-content",
+            "content should match bundled"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_ensure_app_binary_bundled_missing() {
+        let dir = std::env::temp_dir().join(format!("rclonegui-test-{}", std::process::id()));
+        let platform = resolve_platform();
+        let bundled = Path::new("/definitely/does/not/exist/rclone");
+        let result = ensure_app_binary(bundled, &dir, platform);
+        assert!(result.is_err(), "should fail when bundled is missing");
+        assert!(
+            result.unwrap_err().contains("not found"),
+            "error should mention missing bundled"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

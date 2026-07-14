@@ -17,6 +17,7 @@
 /// | `rclone_mount_list` | `Vec<MountInfo>` |
 use std::path::PathBuf;
 
+use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 use tokio::io::BufReader;
 use uuid::Uuid;
@@ -314,6 +315,105 @@ pub async fn rclone_list_dirs(
         .collect();
 
     Ok(dirs)
+}
+
+/// Result returned by `rclone_selfupdate` to the frontend.
+#[derive(Serialize)]
+pub struct SelfUpdateResult {
+    pub success: bool,
+    pub old_version: String,
+    pub new_version: String,
+    pub message: String,
+}
+
+/// Get the plain rclone version string from a binary path.
+async fn get_version(binary: &PathBuf) -> Result<String, String> {
+    let output = tokio::process::Command::new(binary)
+        .arg("version")
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run rclone version: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("rclone version failed: {}", stderr.trim()));
+    }
+
+    let stdout = String::from_utf8(output.stdout)
+        .map_err(|e| format!("Non-UTF-8 output: {}", e))?;
+
+    // Return the first line only (e.g. "rclone v1.65.0")
+    Ok(stdout.lines().next().unwrap_or("unknown").to_string())
+}
+
+/// Update the rclone binary via `rclone selfupdate` with rollback on failure.
+///
+/// 1. Reads the current version
+/// 2. Backs up the binary
+/// 3. Runs `rclone selfupdate`
+/// 4. Smoke test: runs `rclone version` to confirm the new binary works
+/// 5. On failure: restores the backup, returns error
+/// 6. On success: removes the backup
+#[tauri::command]
+pub async fn rclone_selfupdate(state: State<'_, AppState>) -> Result<SelfUpdateResult, String> {
+    let path = get_rclone_path(&state)?;
+
+    // 1. Get old version
+    let old_version = get_version(&path).await.map_err(|e| format!("Cannot determine current rclone version: {e}. Is rclone installed?"))?;
+
+    // 2. Backup
+    let backup_path = path.with_extension("backup");
+    if let Err(e) = std::fs::copy(&path, &backup_path) {
+        return Err(format!("Failed to backup rclone binary: {e}"));
+    }
+
+    // 3. Run selfupdate
+    let output = tokio::process::Command::new(&path)
+        .arg("selfupdate")
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run rclone selfupdate: {e}"))?;
+
+    if !output.status.success() {
+        // Restore backup
+        let _ = std::fs::copy(&backup_path, &path);
+        let _ = std::fs::remove_file(&backup_path);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let old_ver = old_version.clone();
+        return Ok(SelfUpdateResult {
+            success: false,
+            old_version,
+            new_version: old_ver,
+            message: format!("Güncelleme başarısız: {}", stderr.trim()),
+        });
+    }
+
+    // 4. Smoke test: verify the updated binary still works
+    let new_version = match get_version(&path).await {
+        Ok(v) => v,
+        Err(e) => {
+            // Restore backup
+            let _ = std::fs::copy(&backup_path, &path);
+            let _ = std::fs::remove_file(&backup_path);
+            let old_ver = old_version.clone();
+            return Ok(SelfUpdateResult {
+                success: false,
+                old_version,
+                new_version: old_ver,
+                message: format!("Güncelleme sonrası doğrulama başarısız: {e}. Eski sürüme dönüldü."),
+            });
+        }
+    };
+
+    // 5. Clean up backup
+    let _ = std::fs::remove_file(&backup_path);
+
+    Ok(SelfUpdateResult {
+        success: true,
+        old_version,
+        new_version,
+        message: "rclone başarıyla güncellendi.".to_string(),
+    })
 }
 
 // ----- Task 4.4 RED test: rclone_config_list error path -----

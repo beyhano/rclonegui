@@ -3,6 +3,7 @@ import ConfigPanel from "./ConfigPanel";
 import TransferPanel from "./TransferPanel";
 import MountPanel from "./MountPanel";
 import SchedulerPage from "./components/SchedulerPage";
+import RcloneUpdate from "./components/RcloneUpdate";
 import "./App.css";
 
 type Tab = "config" | "transfer" | "mounts" | "scheduler";
@@ -12,7 +13,10 @@ function App() {
 
   return (
     <div className="app">
-      <h1>rclone GUI</h1>
+      <div className="header">
+        <h1>rclone GUI</h1>
+        <RcloneUpdate />
+      </div>
       <nav className="tabs">
         <button
           className={`tab ${activeTab === "config" ? "active" : ""}`}
