@@ -280,6 +280,38 @@ pub async fn task_run_now(state: State<'_, AppState>, id: String) -> Result<(), 
     }
 }
 
+/// Stop a running task process by killing its tracked PID.
+#[tauri::command]
+pub async fn task_stop(state: State<'_, AppState>, id: String) -> Result<(), String> {
+    let pid_opt: Option<u32> = {
+        let pids = state.task_pids.lock().await;
+        pids.get(&id).copied()
+    };
+
+    match pid_opt {
+        Some(pid) => {
+            #[cfg(target_os = "windows")]
+            tokio::process::Command::new("taskkill")
+                .args(&["/PID", &pid.to_string(), "/F"])
+                .output()
+                .await
+                .map_err(|e| format!("Failed to kill PID {}: {}", pid, e))?;
+            #[cfg(not(target_os = "windows"))]
+            tokio::process::Command::new("kill")
+                .arg("-9")
+                .arg(pid.to_string())
+                .output()
+                .await
+                .map_err(|e| format!("Failed to kill PID {}: {}", pid, e))?;
+
+            // Remove from tracking
+            state.task_pids.lock().await.remove(&id);
+            Ok(())
+        }
+        None => Err("Task is not currently running".to_string()),
+    }
+}
+
 /// Fetch available rclone providers by running `rclone config providers`.
 ///
 /// Returns the raw JSON output from rclone, parsed as a `serde_json::Value`.

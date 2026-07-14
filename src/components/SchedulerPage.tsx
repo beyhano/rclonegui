@@ -67,6 +67,12 @@ export default function SchedulerPage() {
     }
   };
 
+  const handleStop = async (id: string) => {
+    await invoke("task_stop", { id });
+    loadTasks();
+    setRunningTasks(prev => { const n = new Set(prev); n.delete(id); return n; });
+  };
+
   if (loading) return <div className="scheduler-page"><p>Loading tasks...</p></div>;
 
   return (
@@ -83,7 +89,7 @@ export default function SchedulerPage() {
       ) : (
         <div className="task-list">
           {tasks.map(task => (
-            <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onRunNow={handleRunNow} onEdit={(t) => { setEditTask(t); setShowForm(true); }} isRunning={runningTasks.has(task.id)} progress={runningTasks.has(task.id) ? Object.values(taskProgress)[0] : undefined} />
+            <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onRunNow={handleRunNow} onEdit={(t) => { setEditTask(t); setShowForm(true); }} onStop={handleStop} isRunning={runningTasks.has(task.id)} progress={runningTasks.has(task.id) ? Object.values(taskProgress)[0] : undefined} />
           ))}
         </div>
       )}

@@ -6,11 +6,12 @@ interface Props {
   onDelete: (id: string) => void;
   onRunNow: (id: string) => void;
   onEdit: (task: Task) => void;
+  onStop: (id: string) => void;
   isRunning?: boolean;
   progress?: { percent: number; speed: string; eta: string };
 }
 
-export default function TaskCard({ task, onToggle, onDelete, onRunNow, onEdit, isRunning, progress }: Props) {
+export default function TaskCard({ task, onToggle, onDelete, onRunNow, onEdit, onStop, isRunning, progress }: Props) {
   return (
     <div className={`task-card ${task.enabled ? "enabled" : "disabled"}`}>
       <div className="task-header">
@@ -33,6 +34,7 @@ export default function TaskCard({ task, onToggle, onDelete, onRunNow, onEdit, i
       <div className="task-actions">
         <button onClick={() => onRunNow(task.id)} title="Run Now">▶</button>
         <button onClick={() => onToggle(task.id)}>{task.enabled ? "⏸ Pause" : "▶ Resume"}</button>
+        {isRunning && <button onClick={() => onStop(task.id)} className="btn-stop">⏹ Stop</button>}
         <button onClick={() => onEdit(task)}>Edit</button>
         <button onClick={() => onDelete(task.id)}>Delete</button>
       </div>

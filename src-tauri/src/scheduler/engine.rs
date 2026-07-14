@@ -1,6 +1,6 @@
 use chrono::Utc;
 use serde::Serialize;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use uuid::Uuid;
 
@@ -34,6 +34,9 @@ pub async fn execute_task(
         args.push("--exclude".to_string());
         args.push(pattern.clone());
     }
+    if !task.exclude_patterns.is_empty() {
+        args.push("--delete-excluded".to_string());
+    }
     args.push("--progress".to_string());
 
     let mut child = tokio::process::Command::new(rclone_path)
@@ -48,6 +51,14 @@ pub async fn execute_task(
         .ok_or_else(|| "Failed to capture stdout".to_string())?;
     let stderr = child.stderr.take()
         .ok_or_else(|| "Failed to capture stderr".to_string())?;
+
+    // Register PID in AppState (task_id → PID) for targeted stop capability
+    let pid = child.id().unwrap_or(0);
+    if let Some(a) = app {
+        let state = a.state::<crate::state::AppState>();
+        let mut pids = state.task_pids.lock().await;
+        pids.insert(task.id.clone(), pid);
+    }
 
     let mut error_lines = Vec::new();
 
@@ -79,6 +90,13 @@ pub async fn execute_task(
     let status = child.wait().await.map_err(|e| format!("Wait error: {}", e))?;
     let completed_at = Utc::now().to_rfc3339();
     let success = status.success();
+
+    // Remove PID from tracking
+    if let Some(a) = app {
+        let state = a.state::<crate::state::AppState>();
+        let mut pids = state.task_pids.lock().await;
+        pids.remove(&task.id);
+    }
 
     Ok(TaskResult {
         task_id: task.id.clone(),

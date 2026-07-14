@@ -37,6 +37,8 @@ pub struct AppState {
     pub task_repo: Arc<tokio::sync::Mutex<crate::db::task_repo::TaskRepo>>,
     /// Optional TaskScheduler for running scheduled transfer tasks on cron.
     pub scheduler: Arc<tokio::sync::Mutex<Option<TaskScheduler>>>,
+    /// Tracks running task process PIDs (process_id → PID) for stop capability.
+    pub task_pids: Arc<tokio::sync::Mutex<HashMap<String, u32>>>,
 }
 
 impl AppState {
@@ -50,6 +52,7 @@ impl AppState {
             mounts: Arc::new(Mutex::new(HashMap::new())),
             task_repo,
             scheduler: Arc::new(tokio::sync::Mutex::new(scheduler)),
+            task_pids: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
         }
     }
 }

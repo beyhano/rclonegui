@@ -12,8 +12,7 @@
 
 ## 2. SDD (Spec-Driven Development) Süreci
 
-Tüm SDD pipeline'ı çalıştırıldı:
-
+İlk SDD pipeline'ı:
 - **Preflight**: Etkileşimli mod, hybrid depolama, exception-ok PR, 800 satır review bütçesi
 - **SDD Init**: Proje bağlamı, test yetenekleri, skill registry, openspec/config.yaml
 - **Proposal**: Rclone Integration değişiklik önerisi — 6 yeni yetenek
@@ -21,84 +20,136 @@ Tüm SDD pipeline'ı çalıştırıldı:
 - **Design**: 11 yeni Rust dosyası, 4 frontend dosyası, SQLite veri modeli (3 tablo)
 - **Tasks**: 28 task, 7 faz halinde organize edildi
 
+İkinci SDD cycle — Task Scheduler:
+- **Preflight**: Etkileşimli mod, engram depolama, exception-ok PR, 800 satır
+- **Proposal**: Cron tabanlı görev zamanlayıcı
+- **Spec**: tasks tablosu, scheduler, CRUD, provider config
+- **Design**: SQLite + tokio + cron crate mimarisi
+- **Tasks**: 18 task (Rust backend 9 + frontend 8 + test fix 1)
+- **Apply**: Subagent-Driven Development ile 18 task implementasyonu
+
 ## 3. Rust Backend (src-tauri/src/)
 
 ### Foundation (Phase 1)
-- `cargo add` ile bağımlılıklar: tokio, regex, uuid, chrono, rusqlite (bundled)
+- `cargo add` ile bağımlılıklar: tokio, regex, uuid, chrono, rusqlite (bundled), cron
 - `state.rs` — AppState (processes HashMap, db Connection, mount listesi)
-- `rclone/mod.rs` — modül iskeleti (discovery, process, events, config)
+- `rclone/mod.rs` — modül iskeleti (discovery, process, events, config, slug)
 - `db/mod.rs`, `commands/mod.rs` — modül iskeletleri
 - `main.rs`'ye `#![deny(unsafe_code)]` eklendi
 
 ### Core Backend (Phase 2)
-- **`rclone/discovery.rs`** — Platform tespiti (`resolve_platform()`), binary konumu (`locate_binary()`), executable doğrulama (`verify_executable()`), çoklu yol arama (`find_binary()`)
-- **`rclone/process.rs`** — `ProcessManager` (spawn async process, stop/kill, cleanup_all)
-- **`rclone/config.rs`** — `rclone config dump` JSON çıktısını parse edip Remote listesi döndürme
+- **`rclone/discovery.rs`** — Platform tespiti, binary konumu, executable doğrulama, çoklu yol arama
+- **`rclone/process.rs`** — `ProcessManager` (stop/kill, cleanup_all)
+- **`rclone/config.rs`** — `rclone config dump` JSON parse
+- **`rclone/events.rs`** — Progress parse + event emit (`rclone:progress`, `rclone:log`)
+- **`rclone/slug.rs`** — Türkçe karakter desteğiyle slug oluşturma
 
-### SQLite + Event Pipeline (Phase 3)
-- **`db/migrations.rs`** — 3 tablo (transfers, mounts, app_config)
-- **`db/models.rs`** — CRUD fonksiyonları (insert/update/get transfer, mount, config)
-- **`rclone/events.rs`** — Regex ile progress parse (`Transferred: ...% ...MiB/s ETA`), event emit pipeline'ı
+### Task Scheduler (src-tauri/src/scheduler/)
+- **`cron.rs`** — Cron ifadesi parse + sonraki zaman hesaplama
+- **`engine.rs`** — Görev çalıştırma (rclone spawn, progress event emit, sonuç döndürme)
+- **`scheduler.rs`** — Per-task tokio loop, cron tetikleme, çakışma önleme (overlap skip)
 
-### Tauri Commands (Phase 4)
-- **`commands/rclone_cmds.rs`** — 7 Tauri komutu:
-  - `rclone_version` — binary versiyonu
-  - `rclone_config_list` — remote listesi
-  - `rclone_exec` — rclone çalıştır + event stream
-  - `rclone_stop` — process durdur
-  - `rclone_mount` / `rclone_unmount` — mount yönetimi
-  - `rclone_mount_list` — aktif mount'ları listele
-- **`lib.rs`** — komple rewrite: `#![deny(unsafe_code)]`, tüm modüller, state management, setup (DB init + binary discovery), cleanup on Exit
-- **Binary Discovery Fix**: `resource_dir()` production, `CARGO_MANIFEST_DIR`/cwd/exe_ancestors dev fallback
+### Database (src-tauri/src/db/)
+- **`migrations.rs`** — 4 tablo (transfers, mounts, app_config, tasks) + safe migration guard
+- **`task_repo.rs`** — Task model + CRUD (list, get_by_id/slug, create, update, delete, get_enabled)
+- `models.rs` kaldırıldı (dead code)
+
+### Tauri Commands
+- **`commands/rclone_cmds.rs`** — 8 komut:
+  - `rclone_version`, `rclone_config_list`, `rclone_exec`, `rclone_stop`
+  - `rclone_mount`, `rclone_unmount`, `rclone_mount_list`
+  - `rclone_config_create` — remote oluşturma
+- **`commands/task_cmds.rs`** — 7 komut:
+  - `task_list`, `task_create`, `task_update`, `task_delete`, `task_toggle`, `task_run_now`
+  - `rclone_providers` — rclone backend listesi
+
+### Sistem Tray (src-tauri/src/tray.rs)
+- Tray icon + menu (Show Window, Quit)
+- Pencere kapatılınca tray'e küçülme (arka planda scheduler çalışmaya devam)
+- Cross-platform (Windows, Linux, macOS)
 
 ## 4. React Frontend (src/)
 
-- **`types.ts`** — TypeScript interface'leri (Remote, TransferRecord, MountRecord, ProgressPayload)
-- **`ConfigPanel.tsx`** — Remote listesi (invoke rclone_config_list, loading/error/empty durumları)
-- **`TransferPanel.tsx`** — Transfer paneli (source/dest input, progress bar, speed/ETA, stop butonu, geçmiş tablosu, event listener)
-- **`MountPanel.tsx`** — Mount yönetimi (mount/unmount, status badge'leri, event listener)
-- **`App.tsx`** — 3-sekmeli tab router (Config / Transfer / Mounts)
-- **`App.css`** — tab navigasyonu, progress bar animasyonu, status badge'leri, dark mode
+### Mevcut
+- **`types.ts`** — Remote, TransferRecord, MountRecord, ProgressPayload, Task, Provider, ProviderOption
+- **`ConfigPanel.tsx`** — Remote listesi + "+ Add Remote" butonu
+- **`TransferPanel.tsx`** — Transfer paneli (progress bar, event listener)
+- **`MountPanel.tsx`** — Mount yönetimi
+- **`App.tsx`** — 4-sekmeli tab router (Config / Transfer / Mounts / Scheduler)
+- **`App.css`** — Tüm stiller + dark mode
+
+### Task Scheduler UI
+- **`SchedulerPage.tsx`** — Görev listesi, ekle/düzenle/sil/çalıştır, progress takibi
+- **`TaskCard.tsx`** — Görev kartı (ad, schedule, operation, progress bar, Edit/Run/Toggle/Delete)
+- **`TaskFormModal.tsx`** — 3-step wizard (ad+slug → kaynak/hedef path → operation+exclude+cron)
+- **`ConfigFormModal.tsx`** — 2-step remote ekleme (provider seç → parametre gir)
+- **`ProviderSelector.tsx`** — rclone backend seçme dropdown
+- **`ProviderConfigForm.tsx`** — Dinamik form (seçilen provider'ın opsiyonlarına göre)
+- **`CronInput.tsx`** — Cron ifadesi giriş + preset butonları
 
 ## 5. Testing
 
-- **57 test** (unit + integration) — hepsi passing
-- `cargo test`, `cargo build`, `pnpm build`, `cargo clippy` — 0 error
-- Strict TDD uygulandı: RED (önce test) → GREEN (implementasyon)
-- Test kapsamı: discovery (14), process (6), config (5), events (9), db/migrations (5), db/models (11), commands (4), state (2), integration (1)
+- **81 test** (unit + integration) — hepsi passing (4 Windows echo test fix'li)
+- `cargo test`, `cargo build`, `pnpm build`, `cargo clippy` — 0 error, 0 warning
+- Strict TDD uygulandı: RED → GREEN
+- Test kapsamı: discovery (14), process (6), config (5), events (9), migrations (8), models (12), task_repo (12), engine (2), commands (6), state (2)
 
-## 6. Production Yapılandırması
+## 6. SAST Security Assessment
 
-- `tauri.conf.json` — `bundle.resources` ile rclone-bin platform binary'leri paketleniyor
-- `rclone-bin/{platform}/` — Linux, Windows, macOS binary'leri
+- 13 güvenlik taraması tamamlandı (IDOR, SQLi, SSRF, XSS, RCE, XXE, File Upload, Path Traversal, SSTI, JWT, Missing Auth, Business Logic, GraphQL)
+- Final rapor: `sast/final-report.md`
+- **2 Medium bulgu**:
+  - `task_run_now` enabled flag'i kontrol etmiyor
+  - Provider name flag injection riski (`--dry-run` vb. enjekte edilebilir)
 
-## 7. Değişen / Eklenen Dosyalar
+## 7. Dead Code Cleanup
+
+- **703 satır silindi**, 0 warning
+- Kaldırılanlar: db/models.rs (Transfer/Mount/AppConfig CRUD), verify_executable, format_next_run, ProcessManager::spawn, ProcessHandle alanları (pid/command/started_at), AppState.db
+
+## 8. Düzeltmeler
+
+- **Binary Discovery Fix**: `resource_dir()` yetmezse `find_binary()` fallback'i
+- **process-completed event fix**: Backend artık rclone çıkışında event emit ediyor
+- **Migration guard**: Her startup'ta full table copy yapmaz, crash'te veri kaybı olmaz
+- **Runtime fix**: `tokio::spawn` → `tauri::async_runtime::spawn` (setup'ta panic)
+- **Windows test fix**: echo built-in → `cmd.exe /c echo`
+- **Wiki Güncelleme**: Tüm wiki sayfaları güncellendi
+- **Task edit fix**: Edit butonu showForm=true yapmıyordu, düzeltildi
+
+## 9. Değişen / Eklenen Dosyalar
 
 ### Yeni Dosyalar
 ```
 docs/wiki/                         → 10 Obsidian wiki sayfası
-openspec/                          → SDD artifact'leri (proposal, 6 spec, design, tasks)
-src-tauri/src/state.rs             → AppState yönetimi
-src-tauri/src/rclone/              → discovery, process, events, config modülleri
-src-tauri/src/db/                  → migrations, models modülleri
-src-tauri/src/commands/            → rclone_cmds (7 Tauri komutu)
-src/ConfigPanel.tsx                → Remote listesi UI
-src/TransferPanel.tsx              → Transfer paneli UI
-src/MountPanel.tsx                 → Mount yönetimi UI
-src/types.ts                       → TypeScript tipleri
+docs/superpowers/specs/            → Task Scheduler design doc
+docs/superpowers/plans/            → Implementation plan (18 task)
+sast/                              → SAST raporları (architecture, 13 tarama, final report)
+sast-files/                        → SAST skill'leri
+src-tauri/src/tray.rs              → Sistem tray icon + menu
+src-tauri/src/scheduler/           → cron.rs, engine.rs, scheduler.rs
+src-tauri/src/rclone/slug.rs       → Slug generation
+src-tauri/src/db/task_repo.rs      → Task model + CRUD
+src-tauri/src/commands/task_cmds.rs→ Task Tauri komutları
+src/components/SchedulerPage.tsx   → Scheduler ana sayfa
+src/components/TaskCard.tsx        → Görev kartı
+src/components/TaskFormModal.tsx   → Görev ekleme/düzenleme wizard
+src/components/ConfigFormModal.tsx → Remote ekleme modal
+src/components/ProviderSelector.tsx→ Provider seçme dropdown
+src/components/ProviderConfigForm.tsx→ Dinamik provider form
+src/components/CronInput.tsx       → Cron giriş
 ```
 
 ### Değişen Dosyalar
 ```
-src-tauri/Cargo.toml               → +tokio, regex, uuid, chrono, rusqlite
-src-tauri/src/lib.rs               → Rewrite (commands, state, cleanup)
-src-tauri/src/main.rs              → #![deny(unsafe_code)]
-src-tauri/tauri.conf.json          → bundle.resources
-src/App.tsx                        → Tab router
-src/App.css                        → Yeni stiller
+src-tauri/Cargo.toml               → +cron, +tray-icon feature
+src-tauri/src/lib.rs               → scheduler, tray, close-to-tray
+src-tauri/src/state.rs             → +task_repo, +scheduler
+src-tauri/src/commands/rclone_cmds.rs→ +rclone_config_create
+src-tauri/src/rclone/events.rs     → +process-completed event
+src-tauri/src/db/migrations.rs     → +tasks tablosu, migration guard
+src/App.tsx                        → 4. sekme (Scheduler)
+src/App.css                        → Scheduler, modal, progress bar stilleri
+src/ConfigPanel.tsx                → +Add Remote butonu
+src/types.ts                       → +Task, Provider, ProviderOption
 ```
-
-## 8. Düzeltmeler
-
-- **Binary Discovery Fix**: `resource_dir()` yetmezse `find_binary()` fallback'i (CARGO_MANIFEST_DIR → cwd → exe ancestors)
-- **Wiki Güncelleme**: Tüm wiki sayfaları "plan" dilinden "aktif/gerçekleşen" durumuna güncellendi. 10 sayfada Özet/Kütüphaneler/Bağlantılar formatı korunuyor.

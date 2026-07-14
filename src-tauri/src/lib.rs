@@ -38,6 +38,7 @@ pub fn run() {
             commands::task_cmds::task_delete,
             commands::task_cmds::task_toggle,
             commands::task_cmds::task_run_now,
+            commands::task_cmds::task_stop,
             commands::task_cmds::rclone_providers,
         ])
         .setup(|app| {
@@ -119,27 +120,47 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    // Hide to tray on close; cleanup on actual exit.
+    // Quit on close (with cleanup); hide to tray via tray menu only.
     app.run(|app_handle, event| {
         match event {
             tauri::RunEvent::WindowEvent {
-                event: tauri::WindowEvent::CloseRequested { api, .. },
+                event: tauri::WindowEvent::CloseRequested { .. },
                 ..
             } => {
-                // Minimize to tray instead of quitting
-                api.prevent_close();
-                if let Some(window) = app_handle.get_webview_window("main") {
-                    let _ = window.hide();
-                }
-            }
-            tauri::RunEvent::Exit => {
-                let state = app_handle.state::<AppState>();
+                let state = app_handle.state::<crate::state::AppState>();
                 let pm = ProcessManager::new(state.processes.clone());
                 let _ = pm.cleanup_all();
-
-                // Stop the scheduler — take the Option so stop() runs only once.
+                // scheduler stop happens in Exit event
+                app_handle.exit(0);
+            }
+            tauri::RunEvent::Exit => {
+                let state = app_handle.state::<crate::state::AppState>();
+                // Kill all running rclone processes
+                let pm = ProcessManager::new(state.processes.clone());
+                let _ = pm.cleanup_all();
+                // Stop the scheduler and kill running task PIDs
                 let sched_arc = state.scheduler.clone();
+                let task_pids = state.task_pids.clone();
                 tauri::async_runtime::spawn(async move {
+                    // Kill all running task process PIDs
+                    let pids_to_kill: Vec<u32> = {
+                        let pids = task_pids.lock().await;
+                        pids.values().copied().collect()
+                    };
+                    for pid in pids_to_kill {
+                        #[cfg(windows)]
+                        let _ = std::process::Command::new("taskkill")
+                            .args(&["/PID", &pid.to_string(), "/F"])
+                            .spawn();
+                        #[cfg(not(windows))]
+                        let _ = std::process::Command::new("kill")
+                            .arg("-9")
+                            .arg(pid.to_string())
+                            .spawn();
+                    }
+                    task_pids.lock().await.clear();
+
+                    // Stop the scheduler
                     let mut guard = sched_arc.lock().await;
                     if let Some(scheduler) = guard.take() {
                         scheduler.stop().await;

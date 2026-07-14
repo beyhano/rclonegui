@@ -193,7 +193,7 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
               <option value="bisync">Bisync</option>
             </select>
             <label>Exclude Patterns (one per line)</label>
-            <textarea value={form.exclude_patterns.join("\n")} onChange={e => setForm(f => ({ ...f, exclude_patterns: e.target.value.split("\n").filter(Boolean) }))} />
+            <textarea value={form.exclude_patterns.join("\n")} onChange={e => setForm(f => ({ ...f, exclude_patterns: e.target.value.split("\n").filter(Boolean) }))} placeholder="node_modules/&#10;*.tmp&#10;.git/**" />
             <CronInput value={form.cron_expr} onChange={v => setForm(f => ({ ...f, cron_expr: v }))} />
           </div>
         )}
