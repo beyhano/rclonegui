@@ -267,21 +267,25 @@ function Publish-Git {
         return
     }
 
-    Write-Host "  -> git tag $tag" -ForegroundColor Gray
-    git tag $tag 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    $tagExists = (git tag -l $tag)
+    if ($tagExists) {
         # Eger etiket zaten varsa ezmek isteyip istemedigini sor
         Write-Host "  [!] $tag etiketi zaten mevcut. Yeniden olusturulsun mu? (Y = evet, N = hayir)" -ForegroundColor Yellow
         $overwriteTag = Read-Host
         if ($overwriteTag -eq "Y" -or $overwriteTag -eq "y") {
-            git tag -d $tag 2>$null
-            git push origin --delete $tag 2>$null
-            git tag $tag
+            $oldEAP = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            git tag -d $tag >$null 2>$null
+            git push origin --delete $tag >$null 2>$null
+            $ErrorActionPreference = $oldEAP
         } else {
             Write-Host "  [XX] Islem iptal edildi." -ForegroundColor Red
             return
         }
     }
+
+    Write-Host "  -> git tag $tag" -ForegroundColor Gray
+    git tag $tag
 
     Write-Host "  -> git push origin $tag" -ForegroundColor Gray
     git push origin $tag
