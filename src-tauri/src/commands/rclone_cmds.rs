@@ -234,6 +234,46 @@ pub fn rclone_mount_list(state: State<'_, AppState>) -> Result<Vec<MountInfo>, S
     Ok(mounts)
 }
 
+/// Create an rclone remote via `rclone config create --non-interactive`.
+///
+/// Takes a remote name, provider prefix, and a JSON string of key-value config pairs.
+#[tauri::command]
+pub async fn rclone_config_create(
+    state: State<'_, AppState>,
+    name: String,
+    provider: String,
+    config: String, // JSON string of key-value pairs
+) -> Result<(), String> {
+    let path = get_rclone_path(&state)?;
+
+    let mut cmd = tokio::process::Command::new(&path);
+    cmd.arg("config")
+        .arg("create")
+        .arg(&name)
+        .arg(&provider)
+        .arg("--non-interactive");
+
+    // Parse config JSON into key=value args
+    if let Ok(map) = serde_json::from_str::<std::collections::HashMap<String, String>>(&config) {
+        for (key, value) in &map {
+            cmd.arg(key);
+            cmd.arg(value);
+        }
+    }
+
+    let output = cmd
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run rclone config create: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to create remote: {}", stderr));
+    }
+
+    Ok(())
+}
+
 // ----- Task 4.4 RED test: rclone_config_list error path -----
 
 #[cfg(test)]

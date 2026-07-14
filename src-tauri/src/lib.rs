@@ -30,6 +30,7 @@ pub fn run() {
             commands::rclone_cmds::rclone_mount,
             commands::rclone_cmds::rclone_unmount,
             commands::rclone_cmds::rclone_mount_list,
+            commands::rclone_cmds::rclone_config_create,
             commands::task_cmds::task_list,
             commands::task_cmds::task_create,
             commands::task_cmds::task_update,
