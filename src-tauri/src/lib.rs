@@ -5,6 +5,7 @@ mod db;
 mod rclone;
 mod scheduler;
 mod state;
+mod tray;
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -101,6 +102,9 @@ pub fn run() {
             let sched_for_start = state.scheduler.clone();
             app.manage(state);
 
+            // Build system tray icon (minimize to tray on close).
+            tray::build_tray(app.handle()).expect("failed to build system tray");
+
             // Start the scheduler after a short delay to let Tauri init complete.
             tauri::async_runtime::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -115,21 +119,34 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    // Cleanup running processes and scheduler on app exit
+    // Hide to tray on close; cleanup on actual exit.
     app.run(|app_handle, event| {
-        if let tauri::RunEvent::Exit = event {
-            let state = app_handle.state::<AppState>();
-            let pm = ProcessManager::new(state.processes.clone());
-            let _ = pm.cleanup_all();
-
-            // Stop the scheduler — take the Option so stop() runs only once.
-            let sched_arc = state.scheduler.clone();
-            tauri::async_runtime::spawn(async move {
-                let mut guard = sched_arc.lock().await;
-                if let Some(scheduler) = guard.take() {
-                    scheduler.stop().await;
+        match event {
+            tauri::RunEvent::WindowEvent {
+                event: tauri::WindowEvent::CloseRequested { api, .. },
+                ..
+            } => {
+                // Minimize to tray instead of quitting
+                api.prevent_close();
+                if let Some(window) = app_handle.get_webview_window("main") {
+                    let _ = window.hide();
                 }
-            });
+            }
+            tauri::RunEvent::Exit => {
+                let state = app_handle.state::<AppState>();
+                let pm = ProcessManager::new(state.processes.clone());
+                let _ = pm.cleanup_all();
+
+                // Stop the scheduler — take the Option so stop() runs only once.
+                let sched_arc = state.scheduler.clone();
+                tauri::async_runtime::spawn(async move {
+                    let mut guard = sched_arc.lock().await;
+                    if let Some(scheduler) = guard.take() {
+                        scheduler.stop().await;
+                    }
+                });
+            }
+            _ => {}
         }
     });
 }
