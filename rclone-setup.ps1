@@ -33,6 +33,25 @@ function Get-Version {
     return $json.version
 }
 
+function Copy-BundlesToDist {
+    $distDir = Join-Path $RepoRoot "build-dist"
+    if (-not (Test-Path $distDir)) {
+        New-Item -ItemType Directory -Path $distDir -Force | Out-Null
+    }
+    $bundleDir = Join-Path $RepoRoot "src-tauri\target\release\bundle"
+    if (Test-Path $bundleDir) {
+        $bundles = Get-ChildItem $bundleDir -Recurse -Include "*.msi","*.exe","*.deb","*.AppImage"
+        if ($bundles) {
+            Write-Host "`n  Bundle ciktilari kopyalaniyor (build-dist/):" -ForegroundColor Cyan
+            foreach ($b in $bundles) {
+                $dest = Join-Path $distDir $b.Name
+                Copy-Item $b.FullName $dest -Force
+                Write-Host "    [+] $($b.Name) -> build-dist/" -ForegroundColor Green
+            }
+        }
+    }
+}
+
 # ---- 1 ----
 function Check-Binaries {
     Write-Host "`n=== rclone Binary Kontrolu ===" -ForegroundColor Cyan
@@ -103,12 +122,7 @@ function Build-Tauri {
     cargo tauri build
     if ($LASTEXITCODE -ne 0) { Write-Host "  [XX] Tauri build hatasi" -ForegroundColor Red; Pop-Location; return }
     Pop-Location
-    # bundle ciktisini goster
-    $bundles = Get-ChildItem (Join-Path $RepoRoot "src-tauri\target\release\bundle") -Recurse -Include "*.msi","*.exe","*.deb","*.AppImage" | Select-Object -First 5
-    if ($bundles) {
-        Write-Host "`n  Bundle ciktilari:" -ForegroundColor Green
-        $bundles | ForEach-Object { Write-Host "    $($_.FullName)" -ForegroundColor White }
-    }
+    Copy-BundlesToDist
 }
 
 # ---- 4 ----
@@ -123,14 +137,14 @@ function Install-WslDeps {
     
     $oldEAP = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
-    wsl.exe -e dpkg -s libwebkit2gtk-4.1-dev >$null 2>$null
+    wsl.exe -e dpkg -s libwebkit2gtk-4.1-dev libayatana-appindicator3-dev >$null 2>$null
     $isInstalled = ($LASTEXITCODE -eq 0)
     $ErrorActionPreference = $oldEAP
 
     if (-not $isInstalled) {
         Write-Host "  -> Eksik paketler yukleniyor (sudo sifresi gerekebilir)..." -ForegroundColor Yellow
         wsl.exe -e sudo apt-get update
-        wsl.exe -e sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev libayatana-appindicator3-dev
+        wsl.exe -e sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev
     }
 }
 
@@ -147,14 +161,14 @@ function Build-Linux {
 
     # Tum islemler WSL icinde - Windows karismaz
     Write-Host "`n  -> pnpm install + pnpm build (WSL)" -ForegroundColor Gray
-    wsl.exe -e bash -l -c "cd '$wslPath' && pnpm install && pnpm build"
+    wsl.exe -e bash -i -c "cd '$wslPath' && pnpm install && pnpm build"
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  [XX] Frontend build hatasi (WSL)" -ForegroundColor Red
         return
     }
 
     Write-Host "  -> cargo build --release (WSL)" -ForegroundColor Gray
-    wsl.exe -e bash -l -c "cd '$wslPath/src-tauri' && cargo build --release"
+    wsl.exe -e bash -i -c "cd '$wslPath/src-tauri' && cargo build --release"
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n  [OK] Linux binary:" -ForegroundColor Green
         Write-Host "     $wslPath/src-tauri/target/release/rclonegui" -ForegroundColor White
@@ -163,10 +177,10 @@ function Build-Linux {
         Write-Host "     Devam? (Enter = evet, N = hayir)" -ForegroundColor Yellow
         $confirm = Read-Host
         if ($confirm -ne "N" -and $confirm -ne "n") {
-            wsl.exe -e bash -l -c "cd '$wslPath' && pnpm tauri build"
+            wsl.exe -e bash -i -c "cd '$wslPath' && pnpm tauri build"
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "`n  [OK] Bundle olusturuldu!" -ForegroundColor Green
-                Write-Host "     $wslPath/src-tauri/target/release/bundle/" -ForegroundColor White
+                Copy-BundlesToDist
             } else {
                 Write-Host "  [XX] Tauri bundle hatasi" -ForegroundColor Red
             }
