@@ -22,18 +22,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: setup node
+      - name: Node.js kurulumu
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: lts/*
 
-      - name: install pnpm
-        uses: pnpm/action-setup@v3
+      - name: pnpm kurulumu
+        uses: pnpm/action-setup@v4
         with:
-          version: 11.12.0
+          version: latest
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
@@ -42,15 +47,15 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev xdg-utils
 
       - name: install frontend dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build and Publish
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         with:
-          tagName: ${{ github.ref_name }}
+          tagName: v__VERSION__
           releaseName: "rclonegui v__VERSION__"
           releaseBody: "rclonegui v__VERSION__"
           releaseDraft: true
