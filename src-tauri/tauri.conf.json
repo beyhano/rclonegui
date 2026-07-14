@@ -41,7 +41,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg3NzVENzdDODYzREZDQzQKUldURS9EMkdmTmQxaDZocHEzOCsrVWJpMVUwSmZ5d1pTT01wM1pOSUhRNStxUXFZVTdueDh5V0cK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI4QzM0NkM3RDFCQzRFQkMKUldTOFRyelJ4MGJES0ZRdTJmYWlJL3k3VWtBS2tSdFFjc1dCWVIzbDVmeGRPZTRKZnIzZDdjVG8K",
       "endpoints": [
         "https://github.com/beyhano/rclonegui/releases/latest/download/latest.json"
       ]
