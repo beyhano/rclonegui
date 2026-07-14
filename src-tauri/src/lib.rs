@@ -39,6 +39,7 @@ pub fn run() {
             commands::task_cmds::task_toggle,
             commands::task_cmds::task_run_now,
             commands::task_cmds::task_stop,
+            commands::task_cmds::task_running_list,
             commands::task_cmds::rclone_providers,
         ])
         .setup(|app| {

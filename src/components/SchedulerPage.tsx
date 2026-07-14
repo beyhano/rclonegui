@@ -20,8 +20,16 @@ export default function SchedulerPage() {
       .finally(() => setLoading(false));
   };
 
+  // Restore running state when coming back to this tab
+  const loadRunning = () => {
+    invoke<string[]>("task_running_list")
+      .then(ids => setRunningTasks(new Set(ids)))
+      .catch(() => {});
+  };
+
   useEffect(() => {
     loadTasks();
+    loadRunning();
     const unlisten1 = listen("task:completed", () => loadTasks());
     const unlisten2 = listen("task:error", () => loadTasks());
     const unlistenProgress = listen("rclone:progress", (event: any) => {

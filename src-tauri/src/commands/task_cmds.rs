@@ -312,6 +312,13 @@ pub async fn task_stop(state: State<'_, AppState>, id: String) -> Result<(), Str
     }
 }
 
+/// Return list of currently running task IDs.
+#[tauri::command]
+pub async fn task_running_list(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    let pids = state.task_pids.lock().await;
+    Ok(pids.keys().cloned().collect())
+}
+
 /// Fetch available rclone providers by running `rclone config providers`.
 ///
 /// Returns the raw JSON output from rclone, parsed as a `serde_json::Value`.
