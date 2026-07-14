@@ -19,7 +19,6 @@
 /// 2. CARGO_MANIFEST_DIR parent — when env var is set (dev/build time)
 /// 3. Current working directory — `pwd/rclone-bin/{platform}/`
 /// 4. Ancestors of current executable — walk up from binary path
-
 use std::path::{Path, PathBuf};
 
 /// Resolve the host platform to a platform identifier string.
@@ -173,8 +172,14 @@ mod tests {
         // Verify by asserting the function returns one of the known strings.
         let platform = resolve_platform();
         assert!(
-            ["linux-amd64", "linux-arm64", "windows-amd64", "osx-amd64", "osx-arm64"]
-                .contains(&platform),
+            [
+                "linux-amd64",
+                "linux-arm64",
+                "windows-amd64",
+                "osx-amd64",
+                "osx-arm64"
+            ]
+            .contains(&platform),
             "resolve_platform() returned unexpected value: {platform}"
         );
     }
@@ -239,5 +244,4 @@ mod tests {
         expected.push("rclone");
         assert_eq!(path, expected);
     }
-
 }

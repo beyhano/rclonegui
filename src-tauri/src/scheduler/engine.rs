@@ -44,9 +44,13 @@ pub async fn execute_task(
         .spawn()
         .map_err(|e| format!("Failed to spawn rclone for task '{}': {}", task.name, e))?;
 
-    let stdout = child.stdout.take()
+    let stdout = child
+        .stdout
+        .take()
         .ok_or_else(|| "Failed to capture stdout".to_string())?;
-    let stderr = child.stderr.take()
+    let stderr = child
+        .stderr
+        .take()
         .ok_or_else(|| "Failed to capture stderr".to_string())?;
 
     // Register PID in AppState (task_id → PID) for targeted stop capability
@@ -74,17 +78,23 @@ pub async fn execute_task(
     while let Ok(Some(line)) = stderr_lines.next_line().await {
         if !line.is_empty() {
             if let Some(app) = app {
-                let _ = app.emit("rclone:log", serde_json::json!({
-                    "process_id": process_id.to_string(),
-                    "line": &line,
-                }));
+                let _ = app.emit(
+                    "rclone:log",
+                    serde_json::json!({
+                        "process_id": process_id.to_string(),
+                        "line": &line,
+                    }),
+                );
             }
             error_lines.push(line);
         }
     }
 
     // Wait for process exit
-    let status = child.wait().await.map_err(|e| format!("Wait error: {}", e))?;
+    let status = child
+        .wait()
+        .await
+        .map_err(|e| format!("Wait error: {}", e))?;
     let completed_at = Utc::now().to_rfc3339();
     let success = status.success();
 
@@ -101,7 +111,11 @@ pub async fn execute_task(
         started_at,
         completed_at: Some(completed_at),
         success,
-        error_message: if success { None } else { Some(error_lines.join("\n")) },
+        error_message: if success {
+            None
+        } else {
+            Some(error_lines.join("\n"))
+        },
     })
 }
 

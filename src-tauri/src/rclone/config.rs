@@ -3,7 +3,6 @@
 /// Parses the output of `rclone config dump` and returns a list of configured
 /// remotes with their names and types. Sensitive fields (tokens, passwords, etc.)
 /// are stripped — only `name` and `type` are returned.
-
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -41,8 +40,8 @@ pub async fn config_list(rclone_path: &Path) -> Result<Vec<Remote>, String> {
     let stdout =
         String::from_utf8(output.stdout).map_err(|e| format!("Non-UTF-8 output: {}", e))?;
 
-    let map: HashMap<String, HashMap<String, serde_json::Value>> =
-        serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse rclone config: {}", e))?;
+    let map: HashMap<String, HashMap<String, serde_json::Value>> = serde_json::from_str(&stdout)
+        .map_err(|e| format!("Failed to parse rclone config: {}", e))?;
 
     let mut remotes: Vec<Remote> = map
         .into_iter()

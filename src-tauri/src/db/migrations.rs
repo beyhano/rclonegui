@@ -2,7 +2,6 @@
 ///
 /// Creates all tables on first initialization using `CREATE TABLE IF NOT EXISTS`
 /// so the function is idempotent and safe to call on every app launch.
-
 use rusqlite::Connection;
 
 /// Create all application tables if they do not already exist.
@@ -165,7 +164,10 @@ mod tests {
                 .filter_map(|r| r.ok())
                 .collect();
 
-            assert!(!columns.is_empty(), "{table} should have at least one column");
+            assert!(
+                !columns.is_empty(),
+                "{table} should have at least one column"
+            );
         }
     }
 
@@ -183,7 +185,10 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(table_count, 4, "all 4 tables should still exist after second call");
+        assert_eq!(
+            table_count, 4,
+            "all 4 tables should still exist after second call"
+        );
     }
 
     #[test]
@@ -203,7 +208,11 @@ mod tests {
             .filter_map(|r| r.ok())
             .collect();
 
-        assert_eq!(columns.len(), 10, "transfers should have 10 columns (added task_id)");
+        assert_eq!(
+            columns.len(),
+            10,
+            "transfers should have 10 columns (added task_id)"
+        );
         assert_eq!(columns[0], ("id".to_string(), "TEXT".to_string()));
         assert_eq!(columns[1], ("remote_src".to_string(), "TEXT".to_string()));
         assert_eq!(columns[9], ("task_id".to_string(), "TEXT".to_string()));

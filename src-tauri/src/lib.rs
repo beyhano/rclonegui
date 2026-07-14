@@ -22,6 +22,7 @@ use crate::state::AppState;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::rclone_cmds::rclone_version,
@@ -48,14 +49,11 @@ pub fn run() {
                 .path()
                 .app_data_dir()
                 .expect("failed to resolve app data directory");
-            std::fs::create_dir_all(&app_dir)
-                .expect("failed to create app data directory");
+            std::fs::create_dir_all(&app_dir).expect("failed to create app data directory");
 
             let db_path = app_dir.join("rclonegui.db");
-            let conn =
-                Connection::open(&db_path).expect("failed to open SQLite database");
-            db::migrations::create_tables(&conn)
-                .expect("failed to create database tables");
+            let conn = Connection::open(&db_path).expect("failed to open SQLite database");
+            db::migrations::create_tables(&conn).expect("failed to create database tables");
 
             // Locate the bundled rclone binary — try resource_dir (production),
             // then fall back to CARGO_MANIFEST_DIR, cwd, and exe ancestors (dev).
@@ -74,8 +72,8 @@ pub fn run() {
                 .or_else(|| rclone::discovery::find_binary(platform));
 
             // Create task repo behind Arc<Mutex> so it can be shared with the scheduler.
-            let task_conn = Connection::open(&db_path)
-                .expect("failed to open SQLite database for TaskRepo");
+            let task_conn =
+                Connection::open(&db_path).expect("failed to open SQLite database for TaskRepo");
             let task_repo = Arc::new(tokio::sync::Mutex::new(TaskRepo::new(task_conn)));
 
             // Convert rclone path to the RwLock<Option<String>> expected by TaskScheduler.
@@ -86,11 +84,8 @@ pub fn run() {
             ));
 
             // Create the TaskScheduler — it owns a clone of task_repo and app handle.
-            let scheduler = TaskScheduler::new(
-                task_repo.clone(),
-                scheduler_rclone,
-                app.handle().clone(),
-            );
+            let scheduler =
+                TaskScheduler::new(task_repo.clone(), scheduler_rclone, app.handle().clone());
 
             // Grab a handle to the scheduler before it's moved into AppState.
             let scheduler_handle = scheduler;
@@ -125,14 +120,14 @@ pub fn run() {
     app.run(|app_handle, event| {
         match event {
             tauri::RunEvent::WindowEvent {
-                event: tauri::WindowEvent::CloseRequested { .. },
+                label,
+                event: tauri::WindowEvent::CloseRequested { api, .. },
                 ..
             } => {
-                let state = app_handle.state::<crate::state::AppState>();
-                let pm = ProcessManager::new(state.processes.clone());
-                let _ = pm.cleanup_all();
-                // scheduler stop happens in Exit event
-                app_handle.exit(0);
+                api.prevent_close();
+                if let Some(window) = app_handle.get_webview_window(&label) {
+                    let _ = window.hide();
+                }
             }
             tauri::RunEvent::Exit => {
                 let state = app_handle.state::<crate::state::AppState>();

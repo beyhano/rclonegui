@@ -12,7 +12,6 @@
 ///
 /// Captures rclone `--progress` output lines like:
 /// `Transferred: 1.190 GiB / 1.190 GiB, 100%, 12.034 MiB/s, ETA 0s`
-
 use std::sync::OnceLock;
 
 use regex::Regex;

@@ -5,7 +5,6 @@
 ///
 /// JSON fields (`source_config`, `dest_config`, `exclude_patterns`) are
 /// serialized to TEXT in SQLite using `serde_json`.
-
 use rusqlite::{params, Connection, Result};
 use serde::{Deserialize, Serialize};
 
@@ -391,7 +390,10 @@ mod tests {
 
         let task2 = sample_task("dup-2", "same-slug");
         let result = repo.create(&task2);
-        assert!(result.is_err(), "duplicate slug should cause UNIQUE constraint violation");
+        assert!(
+            result.is_err(),
+            "duplicate slug should cause UNIQUE constraint violation"
+        );
     }
 
     // -- null / missing JSON fields --

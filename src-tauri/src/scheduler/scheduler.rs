@@ -37,7 +37,8 @@ impl TaskScheduler {
 
     /// Start all enabled task loops.
     pub async fn start(&self) {
-        self.started.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.started
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         let tasks = {
             let repo = self.repo.lock().await;
             repo.get_enabled().unwrap_or_default()
@@ -49,7 +50,8 @@ impl TaskScheduler {
 
     /// Stop all running task loops.
     pub async fn stop(&self) {
-        self.started.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.started
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         let mut tokens = self.cancel_tokens.lock().await;
         for (_, sender) in tokens.drain() {
             let _ = sender.send(());
@@ -103,7 +105,11 @@ impl TaskScheduler {
                 );
 
                 let _ = app.emit(
-                    if task_result.success { "task:completed" } else { "task:error" },
+                    if task_result.success {
+                        "task:completed"
+                    } else {
+                        "task:error"
+                    },
                     serde_json::json!({
                         "task_id": &task.id,
                         "task_name": &task.name,
@@ -114,11 +120,14 @@ impl TaskScheduler {
                 );
             }
             Err(e) => {
-                let _ = app.emit("task:error", serde_json::json!({
-                    "task_id": &task.id,
-                    "task_name": &task.name,
-                    "error": e,
-                }));
+                let _ = app.emit(
+                    "task:error",
+                    serde_json::json!({
+                        "task_id": &task.id,
+                        "task_name": &task.name,
+                        "error": e,
+                    }),
+                );
             }
         }
 
@@ -149,9 +158,7 @@ impl TaskScheduler {
 
                 let now = Utc::now();
                 let delay = (next - now).max(chrono::Duration::zero());
-                let delay_std = std::time::Duration::from_secs(
-                    delay.num_seconds().max(0) as u64,
-                );
+                let delay_std = std::time::Duration::from_secs(delay.num_seconds().max(0) as u64);
 
                 tokio::select! {
                     _ = &mut cancel_rx => break,

@@ -10,7 +10,6 @@
 /// | `task_delete` | `()` |
 /// | `task_toggle` | `Task` |
 /// | `rclone_providers` | `serde_json::Value` |
-
 use std::path::PathBuf;
 
 use chrono::Utc;
@@ -341,5 +340,6 @@ pub async fn rclone_providers(state: State<'_, AppState>) -> Result<serde_json::
     let stdout =
         String::from_utf8(output.stdout).map_err(|e| format!("Non-UTF-8 output: {}", e))?;
 
-    serde_json::from_str(&stdout).map_err(|e| format!("Failed to parse rclone providers JSON: {}", e))
+    serde_json::from_str(&stdout)
+        .map_err(|e| format!("Failed to parse rclone providers JSON: {}", e))
 }

@@ -34,5 +34,4 @@ mod tests {
         let result = next_cron_time("0 0 * * * *").unwrap();
         assert!(result.is_some());
     }
-
 }

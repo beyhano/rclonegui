@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import CronInput from "./CronInput";
 import { Task, Remote, generateSlug } from "../types";
 
@@ -130,27 +131,48 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
   const RemotePathRow = ({ label, remote, path, setRemote, setPath }: {
     label: string; remote: string; path: string;
     setRemote: (v: string) => void; setPath: (v: string) => void;
-  }) => (
-    <div className="remote-path-row">
-      <label>{label}</label>
-      <div className="remote-path-controls">
-        <select value={remote} onChange={e => setRemote(e.target.value)}>
-          <option value="local">📁 Local folder</option>
-          {remotes.map(r => (
-            <option key={r.name} value={r.name}>{r.name} ({r.type})</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          value={path}
-          onChange={e => setPath(e.target.value)}
-          placeholder={remote === "local" ? "C:\\Users\\... or /home/..." : "subfolder (optional)"}
-          className="path-input"
-        />
+  }) => {
+    const handleBrowse = async () => {
+      try {
+        const selected = await open({
+          directory: true,
+          multiple: false,
+        });
+        if (selected && typeof selected === "string") {
+          setPath(selected);
+        }
+      } catch (err) {
+        console.error("Browse failed:", err);
+      }
+    };
+
+    return (
+      <div className="remote-path-row">
+        <label>{label}</label>
+        <div className="remote-path-controls">
+          <select value={remote} onChange={e => setRemote(e.target.value)}>
+            <option value="local">📁 Local folder</option>
+            {remotes.map(r => (
+              <option key={r.name} value={r.name}>{r.name} ({r.type})</option>
+            ))}
+          </select>
+          <input
+            type="text"
+            value={path}
+            onChange={e => setPath(e.target.value)}
+            placeholder={remote === "local" ? "C:\\Users\\... or /home/..." : "subfolder (optional)"}
+            className="path-input"
+          />
+          {remote === "local" && (
+            <button type="button" onClick={handleBrowse} className="btn-browse" title="Browse local directory">
+              📂
+            </button>
+          )}
+        </div>
+        <code className="path-preview">{buildFullPath(remote, path) || "—"}</code>
       </div>
-      <code className="path-preview">{buildFullPath(remote, path) || "—"}</code>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>

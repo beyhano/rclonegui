@@ -77,21 +77,20 @@ mod tests {
     #[test]
     fn test_process_handle_creation() {
         let rt = tokio::runtime::Runtime::new().expect("failed to create runtime");
-        let child = rt.block_on(async {
-            #[cfg(not(target_os = "windows"))]
-            {
-                tokio::process::Command::new("echo")
-                    .arg("test")
-                    .spawn()
-            }
-            #[cfg(target_os = "windows")]
-            {
-                tokio::process::Command::new("cmd.exe")
-                    .args(["/c", "echo", "test"])
-                    .spawn()
-            }
-        })
-        .expect("failed to spawn echo");
+        let child = rt
+            .block_on(async {
+                #[cfg(not(target_os = "windows"))]
+                {
+                    tokio::process::Command::new("echo").arg("test").spawn()
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    tokio::process::Command::new("cmd.exe")
+                        .args(["/c", "echo", "test"])
+                        .spawn()
+                }
+            })
+            .expect("failed to spawn echo");
         let _handle = ProcessHandle::new(child);
         // Just verify creation doesn't panic — removed pid/command/started_at fields
         // use _handle.child if needed

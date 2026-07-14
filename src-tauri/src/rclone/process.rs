@@ -3,7 +3,6 @@
 /// Manages async child processes via `tokio::process::Command` with
 /// `kill_on_drop(true)`. Process state lives in `Arc<Mutex<HashMap<Uuid, ProcessHandle>>>`
 /// inside Tauri's `AppState`.
-
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -57,7 +56,6 @@ impl ProcessManager {
         guard.clear();
         Ok(())
     }
-
 }
 
 #[cfg(test)]
@@ -108,9 +106,7 @@ mod tests {
             .block_on(async {
                 #[cfg(not(target_os = "windows"))]
                 {
-                    tokio::process::Command::new("echo")
-                        .arg("test")
-                        .spawn()
+                    tokio::process::Command::new("echo").arg("test").spawn()
                 }
                 #[cfg(target_os = "windows")]
                 {
