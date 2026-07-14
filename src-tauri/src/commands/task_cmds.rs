@@ -20,6 +20,14 @@ use uuid::Uuid;
 use crate::db::task_repo::Task;
 use crate::state::AppState;
 
+/// Build a `tokio::process::Command` that never opens a console window on Windows.
+fn no_window_cmd(program: impl AsRef<std::ffi::OsStr>) -> tokio::process::Command {
+    let mut cmd = tokio::process::Command::new(program);
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    cmd
+}
+
 /// Helper: get the configured rclone binary path, or return an error.
 fn get_rclone_path(state: &AppState) -> Result<PathBuf, String> {
     let guard = state.rclone_path.lock().map_err(|e| e.to_string())?;
@@ -290,13 +298,13 @@ pub async fn task_stop(state: State<'_, AppState>, id: String) -> Result<(), Str
     match pid_opt {
         Some(pid) => {
             #[cfg(target_os = "windows")]
-            tokio::process::Command::new("taskkill")
+            no_window_cmd("taskkill")
                 .args(&["/PID", &pid.to_string(), "/F"])
                 .output()
                 .await
                 .map_err(|e| format!("Failed to kill PID {}: {}", pid, e))?;
             #[cfg(not(target_os = "windows"))]
-            tokio::process::Command::new("kill")
+            no_window_cmd("kill")
                 .arg("-9")
                 .arg(pid.to_string())
                 .output()
@@ -325,7 +333,7 @@ pub async fn task_running_list(state: State<'_, AppState>) -> Result<Vec<String>
 pub async fn rclone_providers(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     let path = get_rclone_path(&state)?;
 
-    let output = tokio::process::Command::new(&path)
+    let output = no_window_cmd(&path)
         .arg("config")
         .arg("providers")
         .output()

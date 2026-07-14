@@ -7,6 +7,14 @@ use uuid::Uuid;
 pub use crate::db::task_repo::Task;
 use crate::rclone::events::parse_progress_line;
 
+/// Build a `tokio::process::Command` that never opens a console window on Windows.
+fn no_window_cmd(program: impl AsRef<std::ffi::OsStr>) -> tokio::process::Command {
+    let mut cmd = tokio::process::Command::new(program);
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    cmd
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct TaskResult {
     pub task_id: String,
@@ -36,7 +44,7 @@ pub async fn execute_task(
     }
     args.push("--progress".to_string());
 
-    let mut child = tokio::process::Command::new(rclone_path)
+    let mut child = no_window_cmd(rclone_path)
         .args(&args)
         .kill_on_drop(true)
         .stdout(std::process::Stdio::piped())

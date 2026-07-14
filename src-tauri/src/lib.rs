@@ -153,9 +153,13 @@ pub fn run() {
                     };
                     for pid in pids_to_kill {
                         #[cfg(windows)]
-                        let _ = std::process::Command::new("taskkill")
-                            .args(&["/PID", &pid.to_string(), "/F"])
-                            .spawn();
+                        let _ = {
+                            use std::os::windows::process::CommandExt;
+                            std::process::Command::new("taskkill")
+                                .args(&["/PID", &pid.to_string(), "/F"])
+                                .creation_flags(0x0800_0000)
+                                .spawn()
+                        };
                         #[cfg(not(windows))]
                         let _ = std::process::Command::new("kill")
                             .arg("-9")

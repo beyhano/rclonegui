@@ -27,6 +27,15 @@ use crate::rclone::events::start_event_stream;
 use crate::rclone::process::ProcessManager;
 use crate::state::{AppState, MountInfo, ProcessHandle};
 
+/// Build a `tokio::process::Command` that never opens a console window on Windows.
+#[allow(dead_code)]
+fn no_window_cmd(program: impl AsRef<std::ffi::OsStr>) -> tokio::process::Command {
+    let mut cmd = tokio::process::Command::new(program);
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    cmd
+}
+
 /// Helper: get the configured rclone binary path, or return an error.
 fn get_rclone_path(state: &AppState) -> Result<PathBuf, String> {
     let guard = state.rclone_path.lock().map_err(|e| e.to_string())?;
@@ -40,7 +49,7 @@ fn get_rclone_path(state: &AppState) -> Result<PathBuf, String> {
 pub async fn rclone_version(state: State<'_, AppState>) -> Result<String, String> {
     let path = get_rclone_path(&state)?;
 
-    let output = tokio::process::Command::new(&path)
+    let output = no_window_cmd(&path)
         .arg("version")
         .output()
         .await
@@ -76,7 +85,7 @@ pub async fn rclone_exec(
 ) -> Result<String, String> {
     let path = get_rclone_path(&state)?;
 
-    let mut child = tokio::process::Command::new(&path)
+    let mut child = no_window_cmd(&path)
         .args(&args)
         .kill_on_drop(true)
         .stdout(std::process::Stdio::piped())
@@ -166,7 +175,7 @@ pub async fn rclone_mount(
 
     let args = vec!["mount".to_string(), remote_arg, mount_point.clone()];
 
-    let child = tokio::process::Command::new(&path)
+    let child = no_window_cmd(&path)
         .args(&args)
         .kill_on_drop(true)
         .stdout(std::process::Stdio::piped())
@@ -244,7 +253,7 @@ pub async fn rclone_config_create(
 ) -> Result<(), String> {
     let path = get_rclone_path(&state)?;
 
-    let mut cmd = tokio::process::Command::new(&path);
+    let mut cmd = no_window_cmd(&path);
     cmd.arg("config")
         .arg("create")
         .arg(&name)
@@ -291,7 +300,7 @@ pub async fn rclone_list_dirs(
         }
     };
 
-    let output = tokio::process::Command::new(&rclone_path)
+    let output = no_window_cmd(&rclone_path)
         .arg("lsf")
         .arg("--dirs-only")
         .arg("--dir-slash=false")
@@ -328,7 +337,7 @@ pub struct SelfUpdateResult {
 
 /// Get the plain rclone version string from a binary path.
 async fn get_version(binary: &PathBuf) -> Result<String, String> {
-    let output = tokio::process::Command::new(binary)
+    let output = no_window_cmd(binary)
         .arg("version")
         .output()
         .await
@@ -368,7 +377,7 @@ pub async fn rclone_selfupdate(state: State<'_, AppState>) -> Result<SelfUpdateR
     }
 
     // 3. Run selfupdate
-    let output = tokio::process::Command::new(&path)
+    let output = no_window_cmd(&path)
         .arg("selfupdate")
         .output()
         .await

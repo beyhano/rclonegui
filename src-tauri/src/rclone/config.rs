@@ -8,6 +8,14 @@ use std::path::Path;
 
 use serde::Serialize;
 
+/// Build a `tokio::process::Command` that never opens a console window on Windows.
+fn no_window_cmd(program: impl AsRef<std::ffi::OsStr>) -> tokio::process::Command {
+    let mut cmd = tokio::process::Command::new(program);
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    cmd
+}
+
 /// A single rclone remote with its name and type.
 ///
 /// Sensitive configuration fields are intentionally excluded from this struct.
@@ -26,7 +34,7 @@ pub struct Remote {
 /// - If `rclone config dump` exits with a non-zero status.
 /// - If the JSON output cannot be parsed.
 pub async fn config_list(rclone_path: &Path) -> Result<Vec<Remote>, String> {
-    let output = tokio::process::Command::new(rclone_path)
+    let output = no_window_cmd(rclone_path)
         .args(["config", "dump"])
         .output()
         .await
