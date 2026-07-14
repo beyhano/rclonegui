@@ -83,7 +83,7 @@ export default function SchedulerPage() {
       ) : (
         <div className="task-list">
           {tasks.map(task => (
-            <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onRunNow={handleRunNow} onEdit={(t) => setEditTask(t)} isRunning={runningTasks.has(task.id)} progress={runningTasks.has(task.id) ? Object.values(taskProgress)[0] : undefined} />
+            <TaskCard key={task.id} task={task} onToggle={handleToggle} onDelete={handleDelete} onRunNow={handleRunNow} onEdit={(t) => { setEditTask(t); setShowForm(true); }} isRunning={runningTasks.has(task.id)} progress={runningTasks.has(task.id) ? Object.values(taskProgress)[0] : undefined} />
           ))}
         </div>
       )}
