@@ -62,8 +62,14 @@ jobs:
 
       - name: Build frontend
         run: pnpm build
-      - name: Verify dist/
+      - name: Verify dist/ (Linux)
+        if: runner.os == 'Linux'
         run: ls -la dist/ && cat dist/index.html
+      - name: Verify dist/ (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Get-ChildItem dist\
+          Get-Content dist\index.html
       - name: Build and Publish
         uses: tauri-apps/tauri-action@v1
         env:
