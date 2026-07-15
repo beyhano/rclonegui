@@ -62,25 +62,26 @@ jobs:
 
       - name: Build frontend
         run: pnpm build
-      - name: Verify dist/ (Linux)
-        if: runner.os == 'Linux'
-        run: ls -la dist/ && cat dist/index.html
-      - name: Verify dist/ (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          Get-ChildItem dist\
-          Get-Content dist\index.html
-      - name: Build and Publish
-        uses: tauri-apps/tauri-action@v1.0.0
+
+      - name: Build Tauri app
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NO_STRIP: "true"
           TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "rcloneguikey"
-          NO_STRIP: "true"
-        with:
-          tagName: v__VERSION__
-          releaseName: "rclonegui v__VERSION__"
-          releaseBody: "rclonegui v__VERSION__"
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}
+        run: pnpm tauri build
+
+      - name: Upload artifacts to release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BUNDLE_DIR="src-tauri/target/release/bundle"
+          echo "Uploading artifacts for v$VERSION..."
+          # Create release (fails silently if exists)
+          gh release create "v$VERSION" \
+            --title "rclonegui v$VERSION" \
+            --notes "rclonegui v$VERSION" \
+            --draft 2>/dev/null || true
+          # Upload all bundle artifacts
+          gh release upload "v$VERSION" "$BUNDLE_DIR"/*/* --clobber

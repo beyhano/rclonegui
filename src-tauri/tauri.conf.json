@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "rclonegui",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "identifier": "com.beyhan.rclonegui",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "RClone GUI Beta v0.1.6",
+        "title": "RClone GUI Beta v0.1.7",
         "width": 800,
         "height": 600,
         "devtools": true
