@@ -60,6 +60,14 @@ jobs:
           printf '%s\n' "$CLEAN_KEY" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
+      - name: Check frontend dist
+        run: |
+          echo "=== dist/ contents ==="
+          ls -la dist/
+          echo "=== dist/index.html ==="
+          cat dist/index.html
+          echo "=== dist/assets/ ==="
+          ls -la dist/assets/
       - name: Build and Publish
         uses: tauri-apps/tauri-action@v1
         env:
@@ -72,4 +80,4 @@ jobs:
           releaseBody: "rclonegui v__VERSION__"
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          args: --verbose ${{ matrix.args }}
