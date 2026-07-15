@@ -76,6 +76,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "rcloneguikey"
+          NO_STRIP: "true"
         with:
           tagName: v__VERSION__
           releaseName: "rclonegui v__VERSION__"
