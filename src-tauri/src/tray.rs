@@ -16,9 +16,14 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::err
         .item(&quit)
         .build()?;
 
+    let icon = app.default_window_icon().cloned().unwrap_or_else(|| {
+        let icon_bytes = include_bytes!("../icons/32x32.png");
+        tauri::image::Image::from_bytes(icon_bytes).expect("failed to load fallback icon")
+    });
+
     TrayIconBuilder::with_id("main-tray")
         .icon_as_template(false)
-        .icon(app.default_window_icon().cloned().expect("failed to get default window icon"))
+        .icon(icon)
         .menu(&menu)
         .tooltip("RcloneGUI")
         .on_menu_event(|app, event| match event.id.as_ref() {

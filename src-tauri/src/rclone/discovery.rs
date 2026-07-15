@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     fn test_ensure_app_binary_existing() {
-        let dir = std::env::temp_dir().join(format!("rclonegui-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rclonegui-test-existing-{}", std::process::id()));
         let platform = resolve_platform();
         let bin_name = binary_name(platform);
         let folder = platform_folder(platform);
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_ensure_app_binary_copies() {
-        let dir = std::env::temp_dir().join(format!("rclonegui-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rclonegui-test-copies-{}", std::process::id()));
         let platform = resolve_platform();
         let bin_name = binary_name(platform);
         let folder = platform_folder(platform);
@@ -346,7 +346,7 @@ mod tests {
 
     #[test]
     fn test_ensure_app_binary_bundled_missing() {
-        let dir = std::env::temp_dir().join(format!("rclonegui-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rclonegui-test-missing-{}", std::process::id()));
         let platform = resolve_platform();
         let bundled = Path::new("/definitely/does/not/exist/rclone");
         let result = ensure_app_binary(bundled, &dir, platform);

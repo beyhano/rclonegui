@@ -25,6 +25,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             commands::rclone_cmds::rclone_version,
             commands::rclone_cmds::rclone_config_list,
@@ -109,6 +110,21 @@ pub fn run() {
 
             // Build system tray icon (minimize to tray on close).
             tray::build_tray(app.handle()).expect("failed to build system tray");
+
+            // Auto-update check in Rust backend on startup
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                use tauri_plugin_updater::UpdaterExt;
+                // Wait 2 seconds to let initial webview window setup finish
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                if let Ok(updater) = handle.updater() {
+                    if let Ok(Some(update)) = updater.check().await {
+                        if update.download_and_install(|_, _| {}, || {}).await.is_ok() {
+                            handle.restart();
+                        }
+                    }
+                }
+            });
 
             // Start the scheduler after a short delay to let Tauri init complete.
             tauri::async_runtime::spawn(async move {
