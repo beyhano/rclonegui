@@ -23,10 +23,6 @@
     }
   },
   "bundle": {
-    "targets": [
-      "nsis",
-      "appimage"
-    ],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
@@ -34,13 +30,7 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "resources": {
-      "../rclone-bin/linux/rclone": "rclone-bin/linux/rclone",
-      "../rclone-bin/windows/rclone.exe": "rclone-bin/windows/rclone.exe",
-      "../rclone-bin/osx-amd64/rclone": "rclone-bin/osx-amd64/rclone",
-      "../rclone-bin/osx-arm64/rclone": "rclone-bin/osx-arm64/rclone"
-    }
+    ]
   },
   "plugins": {
     "updater": {
