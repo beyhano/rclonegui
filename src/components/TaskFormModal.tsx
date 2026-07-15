@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import Swal from "sweetalert2";
 import CronInput from "./CronInput";
 import { Task, Remote, generateSlug } from "../types";
 
@@ -23,6 +24,9 @@ interface Props {
 }
 
 function parsePath(fullPath: string): { remote: string; path: string } {
+  if (fullPath === "(karadelik)") {
+    return { remote: "(karadelik)", path: "" };
+  }
   if (/^[A-Za-z]:[\\/]/.test(fullPath)) {
     return { remote: "local", path: fullPath };
   }
@@ -80,6 +84,7 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
 
   const buildFullPath = (remote: string, path: string) => {
     if (remote === "local") return path;
+    if (remote === "(karadelik)") return "(karadelik)";
     return path ? `${remote}:${path}` : `${remote}:`;
   };
 
@@ -95,6 +100,43 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
   };
 
   const handleSubmit = async () => {
+    // Karadelik onay dialog'u
+    if (form.dest === "(karadelik)") {
+      const result = await Swal.fire({
+        title: "🚨 Veri Kaybı Uyarısı",
+        html: `
+          <div style="text-align:left;font-size:0.95rem;">
+            <p style="color:#d32f2f;font-weight:bold;font-size:1.1rem;">
+              Karadeliğe gönderilen dosyalar <u>kalıcı olarak yok olur</u>!
+            </p>
+            <ul style="margin-top:0.75rem;line-height:1.6;">
+              <li><b>Copy</b> işlemi dosyaları okur ve atar, kaynakta bir şey değişmez.</li>
+              <li><b>Sync/Move</b> işlemi kaynak dosyaları da <b>siler</b>.</li>
+              <li>Bu işlem <b>geri alınamaz</b>.</li>
+            </ul>
+            <p style="margin-top:0.75rem;color:#555;">
+              Sadece okuma/test amaçlı kullanın.
+            </p>
+          </div>
+        `,
+        input: "checkbox",
+        inputPlaceholder: "Anladım, veri kaybını kabul ediyorum",
+        confirmButtonText: "Evet, gönder",
+        cancelButtonText: "İptal",
+        showCancelButton: true,
+        reverseButtons: true,
+        allowOutsideClick: false,
+        preConfirm: () => {
+          const popup = Swal.getPopup();
+          const cb = popup?.querySelector("#swal2-checkbox") as HTMLInputElement;
+          if (!cb?.checked) {
+            Swal.showValidationMessage("Veri kaybını kabul etmelisiniz");
+          }
+        },
+      });
+      if (!result.isConfirmed) return;
+    }
+
     setSubmitting(true);
     setError("");
     try {
@@ -133,9 +175,10 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
     }
   };
 
-  const RemotePathRow = ({ label, remote, path, setRemote, setPath }: {
+  const RemotePathRow = ({ label, remote, path, setRemote, setPath, showBlackhole }: {
     label: string; remote: string; path: string;
     setRemote: (v: string) => void; setPath: (v: string) => void;
+    showBlackhole?: boolean;
   }) => {
     const handleBrowse = async () => {
       if (remote === "local") {
@@ -163,20 +206,21 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
       <div className="remote-path-row">
         <label>{label}</label>
         <div className="remote-path-controls">
-          <select value={remote} onChange={e => setRemote(e.target.value)}>
-            <option value="local">📁 Local folder</option>
+          <select value={remote} onChange={e => { setRemote(e.target.value); if (e.target.value !== "(karadelik)") setPath(""); }}>
+            <option value="local">📁 Yerel Klasör</option>
             {remotes.map(r => (
               <option key={r.name} value={r.name}>{r.name} ({r.type})</option>
             ))}
+            {showBlackhole && <option value="(karadelik)">🕳️ Karadelik (Veri Yok Olur!)</option>}
           </select>
           <input
             type="text"
             value={path}
             onChange={e => setPath(e.target.value)}
-            placeholder={remote === "local" ? "C:\\Users\\... or /home/..." : "subfolder (optional)"}
+            placeholder={remote === "local" ? "C:\\Users\\... veya /home/..." : "alt klasör (isteğe bağlı)"}
             className="path-input"
           />
-          <button type="button" onClick={handleBrowse} className="btn-browse" title={`Browse ${remote === "local" ? "local" : "remote"} directory`}>
+          <button type="button" onClick={handleBrowse} className="btn-browse" title={remote === "local" ? "Yerel klasör seç" : "Uzak klasör seç"}>
             📂
           </button>
         </div>
@@ -188,13 +232,13 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <h2>{editTask ? `Edit Task — Step ${step}/3` : `New Task — Step ${step}/3`}</h2>
+        <h2>{editTask ? `Görevi Düzenle — Adım ${step}/3` : `Yeni Görev — Adım ${step}/3`}</h2>
         
         {step === 1 && (
           <div className="modal-step">
-            <label>Task Name</label>
+            <label>Görev Adı</label>
             <input value={form.name} onChange={e => updateName(e.target.value)} autoFocus />
-            <label>Slug (auto-generated)</label>
+            <label>Slug (otomatik oluşturulur)</label>
             <input value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} />
           </div>
         )}
@@ -202,30 +246,42 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
         {step === 2 && (
           <div className="modal-step">
             <RemotePathRow
-              label="Source"
+              label="Kaynak"
               remote={form.source} path={form.source_path}
               setRemote={v => setForm(f => ({ ...f, source: v }))}
               setPath={v => setForm(f => ({ ...f, source_path: v }))}
             />
             <RemotePathRow
-              label="Destination"
+              label="Hedef"
               remote={form.dest} path={form.dest_path}
               setRemote={v => setForm(f => ({ ...f, dest: v }))}
               setPath={v => setForm(f => ({ ...f, dest_path: v }))}
+              showBlackhole
             />
+            {form.dest === "(karadelik)" && (
+              <div style={{ background: "#fbe9e7", border: "1px solid #d32f2f", borderRadius: 6, padding: "0.75rem 1rem", marginTop: "0.5rem" }}>
+                <p style={{ color: "#c62828", fontWeight: 600, fontSize: "0.9rem", margin: 0 }}>
+                  ⚠️ Karadeliğe gönderilen dosyalar kalıcı olarak yok olur!
+                </p>
+                <p style={{ color: "#c62828", fontSize: "0.85rem", marginTop: "0.25rem", marginBottom: 0 }}>
+                  Sync/Move kaynak dosyaları da siler. Copy kaynağa dokunmaz.
+                  Sadece test amaçlı kullanın.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
         {step === 3 && (
           <div className="modal-step">
-            <label>Operation</label>
+            <label>İşlem</label>
             <select value={form.operation} onChange={e => setForm(f => ({ ...f, operation: e.target.value }))}>
-              <option value="copy">Copy</option>
-              <option value="sync">Sync</option>
-              <option value="move">Move</option>
-              <option value="bisync">Bisync</option>
+              <option value="copy">Kopyala</option>
+              <option value="sync">Senkronize Et</option>
+              <option value="move">Taşı</option>
+              <option value="bisync">Çift Yönlü</option>
             </select>
-            <label>Exclude Patterns (one per line)</label>
+            <label>Hariç Tutma Kalıpları (her satıra bir tane)</label>
             <textarea value={form.exclude_patterns.join("\n")} onChange={e => setForm(f => ({ ...f, exclude_patterns: e.target.value.split("\n").filter(Boolean) }))} placeholder="node_modules/&#10;*.tmp&#10;.git/**" />
             <CronInput value={form.cron_expr} onChange={v => setForm(f => ({ ...f, cron_expr: v }))} />
           </div>
@@ -234,15 +290,15 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
         {error && <p className="error">{error}</p>}
 
         <div className="modal-actions">
-          {step > 1 && <button onClick={() => setStep(s => s - 1)}>Back</button>}
+          {step > 1 && <button onClick={() => setStep(s => s - 1)}>Geri</button>}
           {step < 3 ? (
-            <button onClick={() => setStep(s => s + 1)} disabled={!canProceed()}>Next</button>
+            <button onClick={() => setStep(s => s + 1)} disabled={!canProceed()}>İleri</button>
           ) : (
             <button onClick={handleSubmit} disabled={submitting}>
-              {submitting ? "Saving..." : editTask ? "Update Task" : "Create Task"}
+              {submitting ? "Kaydediliyor..." : editTask ? "Görevi Güncelle" : "Görev Oluştur"}
             </button>
           )}
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={onClose}>İptal</button>
         </div>
       </div>
 
@@ -311,9 +367,9 @@ function RemoteBrowserModal({ remote, initialPath, onClose, onSelect }: RemoteBr
   return (
     <div className="modal-overlay" style={{ zIndex: 200 }} onClick={onClose}>
       <div className="modal remote-browser-modal" onClick={e => e.stopPropagation()}>
-        <h3>Browse Remote: {remote}</h3>
+        <h3>Uzak Sunucu: {remote}</h3>
         <div className="path-display" style={{ margin: "0.5rem 0", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span>Path:</span>
+          <span>Yol:</span>
           <code className="path-preview" style={{ flex: 1 }}>{path || "/"}</code>
         </div>
 
@@ -325,21 +381,21 @@ function RemoteBrowserModal({ remote, initialPath, onClose, onSelect }: RemoteBr
             onChange={e => setShowHidden(e.target.checked)}
             className="checkbox-input"
           />
-          <label htmlFor="show-hidden" style={{ cursor: "pointer", fontSize: "0.9rem" }}>Show hidden folders</label>
+          <label htmlFor="show-hidden" style={{ cursor: "pointer", fontSize: "0.9rem" }}>Gizli klasörleri göster</label>
         </div>
 
-        {loading && <p style={{ padding: "1rem", textAlign: "center" }}>Loading directories...</p>}
+        {loading && <p style={{ padding: "1rem", textAlign: "center" }}>Klasörler yükleniyor...</p>}
         {error && <p className="error" style={{ padding: "1rem 0" }}>{error}</p>}
 
         {!loading && !error && (
           <div className="directory-list" style={{ maxHeight: "250px", overflowY: "auto", margin: "1rem 0" }}>
             {path && (
               <div className="directory-item up" onClick={goUp}>
-                📁 .. (Go Up)
+                📁 .. (Yukarı Çık)
               </div>
             )}
             {filteredDirs.length === 0 ? (
-              <div style={{ padding: "1rem", color: "#888", textAlign: "center" }}>No subdirectories found</div>
+              <div style={{ padding: "1rem", color: "#888", textAlign: "center" }}>Alt klasör bulunamadı</div>
             ) : (
               filteredDirs.map(d => (
                 <div key={d} className="directory-item" onClick={() => navigateTo(d)}>
@@ -351,8 +407,8 @@ function RemoteBrowserModal({ remote, initialPath, onClose, onSelect }: RemoteBr
         )}
 
         <div className="modal-actions" style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-          <button className="btn-primary" onClick={() => { onSelect(path); onClose(); }}>Select Folder</button>
-          <button onClick={onClose}>Cancel</button>
+          <button className="btn-primary" onClick={() => { onSelect(path); onClose(); }}>Klasör Seç</button>
+          <button onClick={onClose}>İptal</button>
         </div>
       </div>
     </div>

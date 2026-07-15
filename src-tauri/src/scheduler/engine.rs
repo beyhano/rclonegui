@@ -38,10 +38,30 @@ pub async fn execute_task(
     let started_at = Utc::now().to_rfc3339();
     let process_id = Uuid::new_v4();
 
+    // --- Karadelik (Black Hole) handler ---
+    // If destination is "(karadelik)", replace with platform-specific null device.
+    let dest = if task.dest_provider == "(karadelik)" {
+        let null_dev = if cfg!(target_os = "windows") { "NUL" } else { "/dev/null" };
+        let msg = format!(
+            "WARN: Karadelik hedefi kullaniliyor. Hedef: {}. Veri kurtarilamaz!",
+            null_dev
+        );
+        eprintln!("{}", msg);
+        if let Some(a) = app {
+            let _ = a.emit("rclone:log", serde_json::json!({
+                "process_id": process_id.to_string(),
+                "line": &msg,
+            }));
+        }
+        null_dev.to_string()
+    } else {
+        task.dest_provider.clone()
+    };
+
     // Build rclone args — source/dest are full paths (e.g. "gdrive:/backups" or "C:\Users\me")
     let mut args = vec![task.operation.clone()];
     args.push(task.source_provider.clone());
-    args.push(task.dest_provider.clone());
+    args.push(dest);
     for pattern in &task.exclude_patterns {
         args.push("--exclude".to_string());
         args.push(pattern.clone());

@@ -41,7 +41,7 @@ export default function ProviderConfigForm({ options, values, onChange }: Props)
         <div key={opt.Name} className="config-field">
           <label>{opt.Help}{opt.Required && " *"}</label>
           <select value={value} onChange={e => onChange(opt.Name, e.target.value)}>
-            <option value="">-- Select --</option>
+            <option value="">-- Seçin --</option>
             {opt.Examples.map(ex => (
               <option key={ex.Value} value={ex.Value}>{ex.Help} ({ex.Value})</option>
             ))}
@@ -64,7 +64,7 @@ export default function ProviderConfigForm({ options, values, onChange }: Props)
   };
 
   if (options.length === 0) {
-    return <p className="config-empty">Select a provider to see its options.</p>;
+    return <p className="config-empty">Bir sağlayıcı seçin.</p>;
   }
 
   return (
@@ -72,7 +72,7 @@ export default function ProviderConfigForm({ options, values, onChange }: Props)
       {basicOptions.map(renderField)}
       {advancedOptions.length > 0 && (
         <details className="config-advanced">
-          <summary>Advanced Options ({advancedOptions.length})</summary>
+          <summary>Gelişmiş Seçenekler ({advancedOptions.length})</summary>
           {advancedOptions.map(renderField)}
         </details>
       )}

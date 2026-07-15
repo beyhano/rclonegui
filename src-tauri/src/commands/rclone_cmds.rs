@@ -285,6 +285,76 @@ pub async fn rclone_config_create(
     Ok(())
 }
 
+/// Get a single remote's full config via `rclone config dump`.
+#[tauri::command]
+pub async fn rclone_config_get(
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<(String, std::collections::HashMap<String, String>), String> {
+    let path = get_rclone_path(&state)?;
+
+    let output = no_window_cmd(&path)
+        .args(["config", "dump"])
+        .output()
+        .await
+        .map_err(|e| format!("rclone config dump başarısız: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("rclone config dump başarısız: {}", stderr));
+    }
+
+    let stdout = String::from_utf8(output.stdout).map_err(|e| format!("Geçersiz UTF-8: {}", e))?;
+
+    let map: std::collections::HashMap<String, std::collections::HashMap<String, serde_json::Value>> =
+        serde_json::from_str(&stdout).map_err(|e| format!("JSON ayrıştırma hatası: {}", e))?;
+
+    let remote = map
+        .get(&name)
+        .ok_or_else(|| format!("'{}' uzak sunucusu bulunamadı", name))?;
+
+    let provider = remote
+        .get("type")
+        .and_then(|v| v.as_str().map(String::from))
+        .ok_or_else(|| format!("'{}' için sağlayıcı türü bulunamadı", name))?;
+
+    let mut config = std::collections::HashMap::new();
+    for (key, value) in remote {
+        if key != "type" {
+            config.insert(key.clone(), match value {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            });
+        }
+    }
+
+    Ok((provider, config))
+}
+
+/// Delete an rclone remote via `rclone config delete <name>`.
+#[tauri::command]
+pub async fn rclone_config_delete(
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<(), String> {
+    let path = get_rclone_path(&state)?;
+
+    let output = no_window_cmd(&path)
+        .arg("config")
+        .arg("delete")
+        .arg(&name)
+        .output()
+        .await
+        .map_err(|e| format!("rclone config delete başarısız: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Uzak sunucu silinemedi '{}': {}", name, stderr));
+    }
+
+    Ok(())
+}
+
 /// List directories of a remote or local path via `rclone lsf --dirs-only --dir-slash=false`.
 #[tauri::command]
 pub async fn rclone_list_dirs(

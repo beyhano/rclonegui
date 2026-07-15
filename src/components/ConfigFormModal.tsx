@@ -4,17 +4,24 @@ import ProviderSelector from "./ProviderSelector";
 import ProviderConfigForm from "./ProviderConfigForm";
 import { Provider } from "../types";
 
+interface RemoteConfig {
+  name: string;
+  provider: string;
+  config: Record<string, string>;
+}
+
 interface Props {
   onClose: () => void;
   onCreated: () => void;
+  editRemote?: RemoteConfig;
 }
 
-export default function ConfigFormModal({ onClose, onCreated }: Props) {
-  const [step, setStep] = useState(1);
+export default function ConfigFormModal({ onClose, onCreated, editRemote }: Props) {
+  const [step, setStep] = useState(editRemote ? 2 : 1);
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [name, setName] = useState("");
-  const [provider, setProvider] = useState("");
-  const [config, setConfig] = useState<Record<string, string>>({});
+  const [name, setName] = useState(editRemote?.name ?? "");
+  const [provider, setProvider] = useState(editRemote?.provider ?? "");
+  const [config, setConfig] = useState<Record<string, string>>(editRemote?.config ?? {});
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -48,19 +55,19 @@ export default function ConfigFormModal({ onClose, onCreated }: Props) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <h2>Add Remote — Step {step}/2</h2>
+        <h2>{editRemote ? "Uzak Sunucu Düzenle" : "Uzak Sunucu Ekle"} — Adım {step}/2</h2>
 
-        {step === 1 && (
+        {step === 1 && !editRemote && (
           <div className="modal-step">
-            <label>Remote Name</label>
+            <label>Sunucu Adı</label>
             <input
               value={name}
               onChange={e => setName(e.target.value)}
               autoFocus
-              placeholder="my-remote"
+              placeholder="ornek-remote"
             />
             <ProviderSelector
-              label="Provider"
+              label="Sağlayıcı"
               value={provider}
               onChange={setProvider}
             />
@@ -80,22 +87,22 @@ export default function ConfigFormModal({ onClose, onCreated }: Props) {
         {error && <p className="error">{error}</p>}
 
         <div className="modal-actions">
-          {step > 1 && (
-            <button onClick={() => setStep(s => s - 1)}>Back</button>
+          {!editRemote && step > 1 && (
+            <button onClick={() => setStep(s => s - 1)}>Geri</button>
           )}
-          {step < 2 ? (
+          {!editRemote && step < 2 ? (
             <button
               onClick={() => setStep(s => s + 1)}
               disabled={!name || !provider}
             >
-              Next
+              İleri
             </button>
           ) : (
             <button onClick={handleCreate} disabled={submitting}>
-              {submitting ? "Creating..." : "Add Remote"}
+              {submitting ? "Kaydediliyor..." : editRemote ? "Kaydet" : "Uzak Sunucu Ekle"}
             </button>
           )}
-          <button onClick={onClose}>Cancel</button>
+          <button onClick={onClose}>İptal</button>
         </div>
       </div>
     </div>

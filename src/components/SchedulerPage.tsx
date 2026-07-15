@@ -81,18 +81,18 @@ export default function SchedulerPage() {
     setRunningTasks(prev => { const n = new Set(prev); n.delete(id); return n; });
   };
 
-  if (loading) return <div className="scheduler-page"><p>Loading tasks...</p></div>;
+  if (loading) return <div className="scheduler-page"><p>Görevler yükleniyor...</p></div>;
 
   return (
     <div className="scheduler-page">
       <div className="scheduler-header">
-        <h2>Scheduled Tasks</h2>
-        <button onClick={() => { setEditTask(undefined); setShowForm(true); }}>+ New Task</button>
+        <h2>Zamanlanmış Görevler</h2>
+        <button onClick={() => { setEditTask(undefined); setShowForm(true); }}>+ Yeni Görev</button>
       </div>
       {tasks.length === 0 ? (
         <div className="empty-state">
-          <p>No tasks defined yet.</p>
-          <p>Click "New Task" to create your first scheduled operation.</p>
+          <p>Henüz hiçbir görev tanımlanmamış.</p>
+          <p>"Yeni Görev" butonuna tıklayarak ilk zamanlanmış işleminizi oluşturun.</p>
         </div>
       ) : (
         <div className="task-list">
