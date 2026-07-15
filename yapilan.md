@@ -124,6 +124,8 @@
 - **Tray Minimization & Close Intercept**: X butonuna basıldığında uygulama kapatılmak yerine sisteme gizlenir. Windows/macOS'ten sonra Linux'ta da sistem tepsisi ve kapatınca gizleme özelliği tamamen aktif hale getirildi.
 - **Linux Sürüm Yayınlama Betiği**: `rclone-setup.sh` eklenerek Linux üzerinden yerel derleme, paketleme, otomatik imzalama ve GitHub Release süreçleri otomatize edildi.
 - **Beyaz Ekran Düzeltmesi**: `default_window_icon()` fonksiyonunun Linux üzerinde `None` dönerek çökmeye yol açması engellendi; `icons/32x32.png` üzerinden güvenli bir fallback eklendi.
+- **WebKitGTK Grafik Düzeltmesi (Beyaz Ekran)**: Linux'ta bazı ekran kartlarında (özellikle Nvidia) WebKitGTK motorunun çakışarak beyaz ekran vermesi `WEBKIT_DISABLE_DMABUF_RENDERER=1` ortam değişkeniyle engellendi.
+- **Hata Toleranslı Sistem Tepsisi**: Sistem tepsisi (`build_tray`) kütüphane eksikliği veya başka bir hata nedeniyle oluşturulamazsa uygulamanın çökmesi (`panic`) önlendi, hata loglanıp ana pencerenin açılması sağlandı.
 - **Otomatik Güncelleme**: Uygulama başlangıcında Rust tarafında `tauri_plugin_updater` ile arka planda güncelleme denetimi, otomatik indirme/kurulum ve `tauri_plugin_process` ile yeniden başlatma mekanizması kuruldu.
 - **Tauri Dialog Entegrasyonu**: `@tauri-apps/plugin-dialog` eklentisi kurulup konfigüre edilerek yerel klasörleri gözle seçme özelliği getirildi.
 - **Uzak Klasör Tarayıcısı (Remote Browser)**: SFTP, FTP veya diğer uzak sunucuların alt dizinlerini `rclone lsf` ile listeleyen backend komutu (`rclone_list_dirs`) ve frontend `RemoteBrowserModal` gezgini eklendi.

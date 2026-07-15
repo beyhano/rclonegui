@@ -21,6 +21,9 @@ use crate::state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -109,7 +112,9 @@ pub fn run() {
             app.manage(state);
 
             // Build system tray icon (minimize to tray on close).
-            tray::build_tray(app.handle()).expect("failed to build system tray");
+            if let Err(e) = tray::build_tray(app.handle()) {
+                eprintln!("failed to build system tray: {}", e);
+            }
 
             // Auto-update check in Rust backend on startup
             let handle = app.handle().clone();
