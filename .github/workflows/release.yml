@@ -78,10 +78,29 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           BUNDLE_DIR="src-tauri/target/release/bundle"
           echo "Uploading artifacts for v$VERSION..."
+          
           # Create release (fails silently if exists)
           gh release create "v$VERSION" \
             --title "rclonegui v$VERSION" \
             --notes "rclonegui v$VERSION" \
             --draft 2>/dev/null || true
-          # Upload all bundle artifacts
-          gh release upload "v$VERSION" "$BUNDLE_DIR"/*/* --clobber
+            
+          # Debug: list all files in the bundle directory
+          echo "=== Generated Files ==="
+          if [ -d "$BUNDLE_DIR" ]; then
+            find "$BUNDLE_DIR" -type f
+          else
+            echo "Directory $BUNDLE_DIR does not exist!"
+          fi
+          echo "======================="
+          
+          # Upload all files recursively
+          if [ -d "$BUNDLE_DIR" ]; then
+            find "$BUNDLE_DIR" -type f | while read -r file; do
+              echo "Uploading: $file"
+              gh release upload "v$VERSION" "$file" --clobber
+            done
+          else
+            echo "Error: Bundle directory not found. Build may have failed."
+            exit 1
+          fi
