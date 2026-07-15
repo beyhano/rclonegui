@@ -39,11 +39,10 @@ pub async fn execute_task(
     let process_id = Uuid::new_v4();
 
     // --- Karadelik (Black Hole) handler ---
-    // If destination is "(karadelik)", replace with platform-specific null device.
     let dest = if task.dest_provider == "(karadelik)" {
         let null_dev = if cfg!(target_os = "windows") { "NUL" } else { "/dev/null" };
         let msg = format!(
-            "WARN: Karadelik hedefi kullaniliyor. Hedef: {}. Veri kurtarilamaz!",
+            "WARN: Karadelik hedefi: {}. Dosyalar yok edilecek!",
             null_dev
         );
         eprintln!("{}", msg);
