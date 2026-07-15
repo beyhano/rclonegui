@@ -69,6 +69,8 @@ jobs:
             jq '.bundle.targets = ["appimage"] | .bundle.resources = {"../rclone-bin/linux/rclone": "rclone-bin/linux/rclone"}' src-tauri/tauri.conf.json > temp.json
           fi
           mv temp.json src-tauri/tauri.conf.json
+          echo "--- tauri.conf.json (Linux) ---"
+          cat src-tauri/tauri.conf.json
 
       - name: Configure platform-specific tauri.conf.json (Windows)
         if: matrix.platform == 'windows-latest'
@@ -83,6 +85,18 @@ jobs:
           }
           $json.bundle | Add-Member -MemberType NoteProperty -Name "resources" -Value @{ "../rclone-bin/windows/rclone.exe" = "rclone-bin/windows/rclone.exe" } -Force
           $json | ConvertTo-Json -Depth 10 | Out-File src-tauri/tauri.conf.json -Encoding utf8
+          Write-Host "--- tauri.conf.json (Windows) ---"
+          Get-Content src-tauri/tauri.conf.json
+
+      - name: Verify rclone-bin exists
+        shell: bash
+        run: |
+          echo "Checking rclone-bin resources..."
+          if [ "${{ matrix.platform }}" = "ubuntu-22.04" ]; then
+            test -f rclone-bin/linux/rclone && echo "OK: rclone-bin/linux/rclone exists" || { echo "ERROR: rclone-bin/linux/rclone missing!"; exit 1; }
+          else
+            test -f rclone-bin/windows/rclone.exe && echo "OK: rclone-bin/windows/rclone.exe exists" || { echo "ERROR: rclone-bin/windows/rclone.exe missing!"; exit 1; }
+          fi
 
       - name: Build Tauri App and Publish Release
         uses: tauri-apps/tauri-action@v0
@@ -96,6 +110,7 @@ jobs:
           releaseName: 'rclonegui v__VERSION__'
           releaseDraft: false
           prerelease: false
+          updaterJsonPreferNsis: true
 
 
 
