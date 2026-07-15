@@ -16,7 +16,7 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter};
+use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{ChildStderr, ChildStdout};
 use uuid::Uuid;
@@ -74,7 +74,7 @@ pub fn parse_progress_line(process_id: Uuid, line: &str) -> Option<ProgressPaylo
 ///
 /// Returns a `JoinHandle` that resolves when both streams are exhausted.
 pub fn start_event_stream(
-    app: AppHandle,
+    app: tauri::AppHandle<tauri::Wry>,
     process_id: Uuid,
     stdout: BufReader<ChildStdout>,
     stderr: BufReader<ChildStderr>,

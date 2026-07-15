@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::Utc;
-use tauri::{AppHandle, Emitter};
+use tauri::Emitter;
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
@@ -13,7 +13,7 @@ use crate::scheduler::engine::execute_task;
 pub struct TaskScheduler {
     repo: Arc<Mutex<TaskRepo>>,
     rclone_path: Arc<RwLock<Option<String>>>,
-    app: AppHandle,
+    app: tauri::AppHandle<tauri::Wry>,
     cancel_tokens: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<()>>>>,
     running: Arc<Mutex<Vec<String>>>,
     started: Arc<std::sync::atomic::AtomicBool>,
@@ -23,7 +23,7 @@ impl TaskScheduler {
     pub fn new(
         repo: Arc<Mutex<TaskRepo>>,
         rclone_path: Arc<RwLock<Option<String>>>,
-        app: AppHandle,
+        app: tauri::AppHandle<tauri::Wry>,
     ) -> Self {
         Self {
             repo,

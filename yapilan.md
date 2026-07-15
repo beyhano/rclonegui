@@ -121,11 +121,18 @@
 - **Exclude fix**: `--delete-excluded` kaldırıldı, sadece `--exclude` ile yüklemeyi engelle
 - **Stop button**: ⏹ Stop butonu — taskkill/PID ile process sonlandırma
 - **Tab switch fix**: Scheduler sekmeye geri dönünce `task_running_list` ile çalışan task'lar geri yükleniyor
+- **Tray Minimization & Close Intercept**: X butonuna basıldığında uygulama kapatılmak yerine sisteme gizlenir. Windows/macOS'ten sonra Linux'ta da sistem tepsisi ve kapatınca gizleme özelliği tamamen aktif hale getirildi.
+- **Linux Sürüm Yayınlama Betiği**: `rclone-setup.sh` eklenerek Linux üzerinden yerel derleme, paketleme, otomatik imzalama ve GitHub Release süreçleri otomatize edildi.
+- **Tauri Dialog Entegrasyonu**: `@tauri-apps/plugin-dialog` eklentisi kurulup konfigüre edilerek yerel klasörleri gözle seçme özelliği getirildi.
+- **Uzak Klasör Tarayıcısı (Remote Browser)**: SFTP, FTP veya diğer uzak sunucuların alt dizinlerini `rclone lsf` ile listeleyen backend komutu (`rclone_list_dirs`) ve frontend `RemoteBrowserModal` gezgini eklendi.
+- **Gizli Klasör Filtresi**: Uzak klasör tarayıcısında noktayla başlayan gizli klasörlerin listelenmesini açıp kapatan "Show hidden folders" onay kutusu yerleştirildi.
+- **CSS ve Koyu Mod İyileştirmeleri**: Seçim kutuları (`select`) için `appearance: none` uygulanarak Linux temalarındaki beyaz kalma hatası giderildi, özel SVG ok işaretleri yerleştirildi ve dikey hizalamalar eşitlendi.
 
 ## 9. Değişen / Eklenen Dosyalar
 
 ### Yeni Dosyalar
 ```
+rclone-setup.sh                    → Linux build/publish betiği
 docs/wiki/                         → 10 Obsidian wiki sayfası
 docs/superpowers/specs/            → Task Scheduler design doc
 docs/superpowers/plans/            → Implementation plan (18 task)
@@ -147,14 +154,17 @@ src/components/CronInput.tsx       → Cron giriş
 
 ### Değişen Dosyalar
 ```
-src-tauri/Cargo.toml               → +cron, +tray-icon feature
-src-tauri/src/lib.rs               → scheduler, tray, close-to-tray
+package.json                       → +@tauri-apps/plugin-dialog eklentisi
+src-tauri/Cargo.toml               → +cron, +tray-icon, +tauri-plugin-dialog eklentisi
+src-tauri/Cargo.lock               → Bağımlılık ağacı güncellendi
+src-tauri/capabilities/default.json→ +dialog:default izni
+src-tauri/src/lib.rs               → scheduler, tray, close-to-tray, tauri-dialog kaydı
 src-tauri/src/state.rs             → +task_repo, +scheduler
-src-tauri/src/commands/rclone_cmds.rs→ +rclone_config_create
+src-tauri/src/commands/rclone_cmds.rs→ +rclone_config_create, +rclone_list_dirs (klasör listeleme)
 src-tauri/src/rclone/events.rs     → +process-completed event
 src-tauri/src/db/migrations.rs     → +tasks tablosu, migration guard
 src/App.tsx                        → 4. sekme (Scheduler)
-src/App.css                        → Scheduler, modal, progress bar stilleri
+src/App.css                        → UI, modal, select, remote browser ve ok stilleri
 src/ConfigPanel.tsx                → +Add Remote butonu
 src/types.ts                       → +Task, Provider, ProviderOption
 ```

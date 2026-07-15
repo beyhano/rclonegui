@@ -18,7 +18,7 @@ pub fn build_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::err
 
     TrayIconBuilder::with_id("main-tray")
         .icon_as_template(false)
-        .icon(app.default_window_icon().cloned().unwrap())
+        .icon(app.default_window_icon().cloned().expect("failed to get default window icon"))
         .menu(&menu)
         .tooltip("RcloneGUI")
         .on_menu_event(|app, event| match event.id.as_ref() {

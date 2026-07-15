@@ -16,7 +16,7 @@
 | [[Process_Manager]] | Async süreç yaşam döngüsü (spawn, izleme, temiz sonlandırma) | ✅ Aktif |
 | [[State_Management]] | Tauri State ile çalışan süreçlerin PID, mount, task_repo, scheduler ve task_pids yönetimi | ✅ Aktif |
 | [[Event_Stream]] | stdout/stderr ayrıştırma ve frontend'e gerçek zamanlı emit | ✅ Aktif |
-| [[React_Frontend]] | React 19 + TypeScript UI katmanı (3 panel) | ✅ Aktif |
+| [[React_Frontend]] | React 19 + TypeScript UI katmanı (4 panel) | ✅ Aktif |
 | [[Build_Config]] | Vite, pnpm, Cargo derleme araç zinciri | ✅ Aktif |
 | [[Architecture_Overview]] | Tüm sistemin katmanlı mimarî şeması | ✅ Aktif |
 
@@ -38,8 +38,9 @@
 | Config | `src/ConfigPanel.tsx` | Remote listeleme, tür badge'leri |
 | Transfer | `src/TransferPanel.tsx` | Copy/sync başlatma, progress bar, hız, ETA, geçmiş |
 | Mounts | `src/MountPanel.tsx` | Mount bağlama/çözme, durum göstergeleri |
+| Scheduler | `src/components/SchedulerPage.tsx` | Görev zamanlama, listeleme, manuel tetikleme, durdurma, remote klasör tarayıcı |
 
-## ⚙️ Tauri Komutları (16 adet)
+## ⚙️ Tauri Komutları (17 adet)
 
 ### rclone işlemleri (`commands/rclone_cmds.rs`)
 
@@ -53,6 +54,7 @@
 | `rclone_mount` | Remote dosya sistemi bağlar |
 | `rclone_unmount` | Mount'ı UUID ile çözer |
 | `rclone_mount_list` | Aktif mount'ları listeler |
+| `rclone_list_dirs` | Dizin yapısını listeler (yerel veya uzak sunucu) |
 
 ### Task/Scheduler işlemleri (`commands/task_cmds.rs`)
 
@@ -83,12 +85,12 @@
 ```
 src-tauri/src/
 ├── main.rs
-├── lib.rs              ← Builder, setup, 16 komut, tray, cleanup
+├── lib.rs              ← Builder, setup, 17 komut, tray, cleanup, dialog
 ├── state.rs            ← AppState (processes, rclone_path, mounts, task_repo, scheduler, task_pids)
 ├── tray.rs             ← System tray
 ├── commands/
 │   ├── mod.rs
-│   ├── rclone_cmds.rs  ← 8 Tauri komutu
+│   ├── rclone_cmds.rs  ← 9 Tauri komutu
 │   └── task_cmds.rs    ← 8 Tauri komutu
 ├── rclone/
 │   ├── mod.rs

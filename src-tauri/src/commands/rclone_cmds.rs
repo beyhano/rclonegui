@@ -18,7 +18,7 @@
 use std::path::PathBuf;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{Emitter, State};
 use tokio::io::BufReader;
 use uuid::Uuid;
 
@@ -30,9 +30,13 @@ use crate::state::{AppState, MountInfo, ProcessHandle};
 /// Build a `tokio::process::Command` that never opens a console window on Windows.
 #[allow(dead_code)]
 fn no_window_cmd(program: impl AsRef<std::ffi::OsStr>) -> tokio::process::Command {
-    let mut cmd = tokio::process::Command::new(program);
+    let cmd = tokio::process::Command::new(program);
     #[cfg(windows)]
-    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    let cmd = {
+        let mut cmd = cmd;
+        cmd.creation_flags(0x0800_0000);
+        cmd
+    };
     cmd
 }
 
@@ -79,7 +83,7 @@ pub async fn rclone_config_list(state: State<'_, AppState>) -> Result<Vec<Remote
 /// reference it in subsequent `rclone_stop` calls and listen for progress events.
 #[tauri::command]
 pub async fn rclone_exec(
-    app: AppHandle,
+    app: tauri::AppHandle<tauri::Wry>,
     state: State<'_, AppState>,
     args: Vec<String>,
 ) -> Result<String, String> {
@@ -159,7 +163,7 @@ pub async fn rclone_stop(state: State<'_, AppState>, process_id: String) -> Resu
 /// (e.g. `"gdrive:"` or `"gdrive"`).
 #[tauri::command]
 pub async fn rclone_mount(
-    app: AppHandle,
+    app: tauri::AppHandle<tauri::Wry>,
     state: State<'_, AppState>,
     remote: String,
     mount_point: String,

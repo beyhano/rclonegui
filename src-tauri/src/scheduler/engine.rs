@@ -9,9 +9,13 @@ use crate::rclone::events::parse_progress_line;
 
 /// Build a `tokio::process::Command` that never opens a console window on Windows.
 fn no_window_cmd(program: impl AsRef<std::ffi::OsStr>) -> tokio::process::Command {
-    let mut cmd = tokio::process::Command::new(program);
+    let cmd = tokio::process::Command::new(program);
     #[cfg(windows)]
-    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    let cmd = {
+        let mut cmd = cmd;
+        cmd.creation_flags(0x0800_0000);
+        cmd
+    };
     cmd
 }
 
@@ -29,7 +33,7 @@ pub struct TaskResult {
 pub async fn execute_task(
     task: &Task,
     rclone_path: &str,
-    app: Option<&tauri::AppHandle>,
+    app: Option<&tauri::AppHandle<tauri::Wry>>,
 ) -> Result<TaskResult, String> {
     let started_at = Utc::now().to_rfc3339();
     let process_id = Uuid::new_v4();

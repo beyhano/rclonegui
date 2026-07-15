@@ -10,9 +10,13 @@ use serde::Serialize;
 
 /// Build a `tokio::process::Command` that never opens a console window on Windows.
 fn no_window_cmd(program: impl AsRef<std::ffi::OsStr>) -> tokio::process::Command {
-    let mut cmd = tokio::process::Command::new(program);
+    let cmd = tokio::process::Command::new(program);
     #[cfg(windows)]
-    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    let cmd = {
+        let mut cmd = cmd;
+        cmd.creation_flags(0x0800_0000);
+        cmd
+    };
     cmd
 }
 
