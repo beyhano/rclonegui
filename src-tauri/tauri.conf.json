@@ -24,7 +24,6 @@
   },
   "bundle": {
     "targets": [
-      "msi",
       "nsis",
       "appimage"
     ],

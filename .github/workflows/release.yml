@@ -44,7 +44,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev xdg-utils
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev xdg-utils libfuse2 squashfs-tools
 
       - name: install frontend dependencies
         run: pnpm install --frozen-lockfile
@@ -60,47 +60,17 @@ jobs:
           printf '%s\n' "$CLEAN_KEY" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Build frontend
-        run: pnpm build
-
-      - name: Build Tauri app
-        env:
-          NO_STRIP: "true"
-          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "rcloneguikey"
-        run: pnpm tauri build
-
-      - name: Upload artifacts to release
-        shell: bash
+      - name: Build Tauri App and Publish Release
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          BUNDLE_DIR="src-tauri/target/release/bundle"
-          echo "Uploading artifacts for v$VERSION..."
-          
-          # Create release (fails silently if exists)
-          gh release create "v$VERSION" \
-            --title "rclonegui v$VERSION" \
-            --notes "rclonegui v$VERSION" \
-            --draft 2>/dev/null || true
-            
-          # Debug: list all files in the bundle directory
-          echo "=== Generated Files ==="
-          if [ -d "$BUNDLE_DIR" ]; then
-            find "$BUNDLE_DIR" -type f
-          else
-            echo "Directory $BUNDLE_DIR does not exist!"
-          fi
-          echo "======================="
-          
-          # Upload all files recursively
-          if [ -d "$BUNDLE_DIR" ]; then
-            find "$BUNDLE_DIR" -type f | while read -r file; do
-              echo "Uploading: $file"
-              gh release upload "v$VERSION" "$file" --clobber
-            done
-          else
-            echo "Error: Bundle directory not found. Build may have failed."
-            exit 1
-          fi
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "rcloneguikey"
+          NO_STRIP: "true"
+        with:
+          tagName: v__VERSION__
+          releaseName: 'rclonegui v__VERSION__'
+          releaseBody: 'rclonegui v__VERSION__'
+          releaseDraft: false
+          prerelease: false
+
