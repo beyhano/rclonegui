@@ -1,9 +1,9 @@
-name: "Publish Release"
+name: 'rclonegui-release'
 
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
 jobs:
   publish-tauri:
@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: "ubuntu-22.04"
-          - platform: "windows-latest"
+          - platform: 'ubuntu-22.04'
+          - platform: 'windows-latest'
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -30,7 +30,7 @@ jobs:
         with:
           version: latest
 
-      - name: install Rust stable
+      - name: Rust kurulumu
         uses: dtolnay/rust-toolchain@stable
 
       - name: Rust cache
@@ -38,79 +38,24 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: install dependencies (ubuntu only)
+      - name: Linux bagimliliklari
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev xdg-utils libfuse2 squashfs-tools
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev libfuse2
 
-      - name: install frontend dependencies
+      - name: Frontend bagimliliklari
         run: pnpm install --frozen-lockfile
 
-      - name: Sanitize signing key
-        shell: bash
-        env:
-          RAW_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          CLEAN_KEY=$(printf '%s' "$RAW_KEY" | tr -d '\r')
-          CLEAN_KEY="${CLEAN_KEY%${CLEAN_KEY##*[![:space:]]}}"
-          echo "TAURI_SIGNING_PRIVATE_KEY<<EOF" >> $GITHUB_ENV
-          printf '%s\n' "$CLEAN_KEY" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
-      - name: Configure platform-specific tauri.conf.json (Linux)
-        if: matrix.platform == 'ubuntu-22.04'
-        env:
-          SIGNING_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          if [ -z "$SIGNING_KEY" ]; then
-            jq '.bundle.targets = ["appimage"] | .bundle.createUpdaterArtifacts = false | .bundle.resources = {"../rclone-bin/linux/rclone": "rclone-bin/linux/rclone"}' src-tauri/tauri.conf.json > temp.json
-          else
-            jq '.bundle.targets = ["appimage"] | .bundle.resources = {"../rclone-bin/linux/rclone": "rclone-bin/linux/rclone"}' src-tauri/tauri.conf.json > temp.json
-          fi
-          mv temp.json src-tauri/tauri.conf.json
-          echo "--- tauri.conf.json (Linux) ---"
-          cat src-tauri/tauri.conf.json
-
-      - name: Configure platform-specific tauri.conf.json (Windows)
-        if: matrix.platform == 'windows-latest'
-        shell: pwsh
-        env:
-          SIGNING_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          $json = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
-          $json.bundle.targets = @("nsis")
-          if ([string]::IsNullOrEmpty($env:SIGNING_KEY)) {
-            $json.bundle.createUpdaterArtifacts = $false
-          }
-          $json.bundle | Add-Member -MemberType NoteProperty -Name "resources" -Value @{ "../rclone-bin/windows/rclone.exe" = "rclone-bin/windows/rclone.exe" } -Force
-          $json | ConvertTo-Json -Depth 10 | Out-File src-tauri/tauri.conf.json -Encoding utf8
-          Write-Host "--- tauri.conf.json (Windows) ---"
-          Get-Content src-tauri/tauri.conf.json
-
-      - name: Verify rclone-bin exists
-        shell: bash
-        run: |
-          echo "Checking rclone-bin resources..."
-          if [ "${{ matrix.platform }}" = "ubuntu-22.04" ]; then
-            test -f rclone-bin/linux/rclone && echo "OK: rclone-bin/linux/rclone exists" || { echo "ERROR: rclone-bin/linux/rclone missing!"; exit 1; }
-          else
-            test -f rclone-bin/windows/rclone.exe && echo "OK: rclone-bin/windows/rclone.exe exists" || { echo "ERROR: rclone-bin/windows/rclone.exe missing!"; exit 1; }
-          fi
-
-      - name: Build Tauri App and Publish Release
-        uses: tauri-apps/tauri-action@v0
+      - name: Tauri build + release
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "rcloneguikey"
-          NO_STRIP: "true"
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: 'rcloneguikey'
         with:
           tagName: v__VERSION__
           releaseName: 'rclonegui v__VERSION__'
-          releaseDraft: false
+          releaseBody: 'Detayli degisiklik listesi icin CHANGELOG.md dosyasina bakin.'
+          releaseDraft: true
           prerelease: false
-          updaterJsonPreferNsis: true
-
-
-

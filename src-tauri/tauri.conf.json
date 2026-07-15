@@ -23,11 +23,16 @@
     }
   },
   "bundle": {
+    "active": true,
     "targets": [
       "nsis",
       "appimage"
     ],
     "createUpdaterArtifacts": true,
+    "resources": {
+      "../rclone-bin/linux/rclone": "rclone-bin/linux/rclone",
+      "../rclone-bin/windows/rclone.exe": "rclone-bin/windows/rclone.exe"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
