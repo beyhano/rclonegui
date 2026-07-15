@@ -206,25 +206,31 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
       <div className="remote-path-row">
         <label>{label}</label>
         <div className="remote-path-controls">
-          <select value={remote} onChange={e => { setRemote(e.target.value); if (e.target.value !== "(karadelik)") setPath(""); }}>
+          <select value={remote} onChange={e => { setRemote(e.target.value); setPath(""); }}>
             <option value="local">📁 Yerel Klasör</option>
             {remotes.map(r => (
               <option key={r.name} value={r.name}>{r.name} ({r.type})</option>
             ))}
             {showBlackhole && <option value="(karadelik)">🕳️ Karadelik (Veri Yok Olur!)</option>}
           </select>
-          <input
-            type="text"
-            value={path}
-            onChange={e => setPath(e.target.value)}
-            placeholder={remote === "local" ? "C:\\Users\\... veya /home/..." : "alt klasör (isteğe bağlı)"}
-            className="path-input"
-          />
-          <button type="button" onClick={handleBrowse} className="btn-browse" title={remote === "local" ? "Yerel klasör seç" : "Uzak klasör seç"}>
-            📂
-          </button>
+          {remote !== "(karadelik)" && (
+            <>
+              <input
+                type="text"
+                value={path}
+                onChange={e => setPath(e.target.value)}
+                placeholder={remote === "local" ? "C:\\Users\\... veya /home/..." : "alt klasör (isteğe bağlı)"}
+                className="path-input"
+              />
+              <button type="button" onClick={handleBrowse} className="btn-browse" title={remote === "local" ? "Yerel klasör seç" : "Uzak klasör seç"}>
+                📂
+              </button>
+            </>
+          )}
         </div>
-        <code className="path-preview">{buildFullPath(remote, path) || "—"}</code>
+        {remote !== "(karadelik)" && (
+          <code className="path-preview">{buildFullPath(remote, path) || "—"}</code>
+        )}
       </div>
     );
   };
