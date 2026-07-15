@@ -1,8 +1,0 @@
-{
-  "bundle": {
-    "targets": ["nsis"],
-    "resources": {
-      "../rclone-bin/windows/rclone.exe": "rclone-bin/windows/rclone.exe"
-    }
-  }
-}
