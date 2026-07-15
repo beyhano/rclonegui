@@ -60,16 +60,27 @@ jobs:
 
       - name: Configure platform-specific tauri.conf.json (Linux)
         if: matrix.platform == 'ubuntu-22.04'
+        env:
+          SIGNING_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
-          jq '.bundle.targets = ["appimage"] | .bundle.resources = {"../rclone-bin/linux/rclone": "rclone-bin/linux/rclone"}' src-tauri/tauri.conf.json > temp.json
+          if [ -z "$SIGNING_KEY" ]; then
+            jq '.bundle.targets = ["appimage"] | .bundle.createUpdaterArtifacts = false | .bundle.resources = {"../rclone-bin/linux/rclone": "rclone-bin/linux/rclone"}' src-tauri/tauri.conf.json > temp.json
+          else
+            jq '.bundle.targets = ["appimage"] | .bundle.resources = {"../rclone-bin/linux/rclone": "rclone-bin/linux/rclone"}' src-tauri/tauri.conf.json > temp.json
+          fi
           mv temp.json src-tauri/tauri.conf.json
 
       - name: Configure platform-specific tauri.conf.json (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
+        env:
+          SIGNING_KEY: ${{ env.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           $json = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
           $json.bundle.targets = @("nsis")
+          if ([string]::IsNullOrEmpty($env:SIGNING_KEY)) {
+            $json.bundle.createUpdaterArtifacts = $false
+          }
           $json.bundle | Add-Member -MemberType NoteProperty -Name "resources" -Value @{ "../rclone-bin/windows/rclone.exe" = "rclone-bin/windows/rclone.exe" } -Force
           $json | ConvertTo-Json -Depth 10 | Out-File src-tauri/tauri.conf.json -Encoding utf8
 
