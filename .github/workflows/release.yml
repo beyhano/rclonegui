@@ -14,9 +14,9 @@ jobs:
       matrix:
         include:
           - platform: "ubuntu-22.04"
-            args: ""
+            args: "--config src-tauri/tauri.linux.conf.json"
           - platform: "windows-latest"
-            args: ""
+            args: "--config src-tauri/tauri.windows.conf.json"
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -70,7 +70,8 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'rclonegui v__VERSION__'
-          releaseBody: 'rclonegui v__VERSION__'
           releaseDraft: false
           prerelease: false
+          args: ${{ matrix.args }}
+
 
