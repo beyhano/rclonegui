@@ -100,28 +100,39 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
   };
 
   const handleSubmit = async () => {
-    // Karadelik onay dialog'u
+    // Karadelik confirmation dialog
     if (form.dest === "(karadelik)") {
+      const isDestructive = ["move", "sync"].includes(form.operation);
       const result = await Swal.fire({
-        title: "🚨 Veri Kaybı Uyarısı",
-        html: `
+        title: isDestructive ? "🚨 Veri Kaybı Uyarısı" : "🕳️ Karadelik Hedefi",
+        html: isDestructive ? `
           <div style="text-align:left;font-size:0.95rem;">
             <p style="color:#d32f2f;font-weight:bold;font-size:1.1rem;">
-              Karadeliğe gönderilen dosyalar <u>kalıcı olarak yok olur</u>!
+              <b>${form.operation.toUpperCase()}</b> + Karadelik — kaynak dosyalar <u>kalıcı olarak silinecek</u>!
             </p>
             <ul style="margin-top:0.75rem;line-height:1.6;">
-              <li><b>Copy</b> işlemi dosyaları okur ve atar, kaynakta bir şey değişmez.</li>
-              <li><b>Sync/Move</b> işlemi kaynak dosyaları da <b>siler</b>.</li>
+              <li>rclone kaynak dosyaları <b>direkt siler</b> (<code>rclone delete</code>).</li>
+              <li>Geri dönüşüm kutusuna <b>gitmez</b>.</li>
               <li>Bu işlem <b>geri alınamaz</b>.</li>
             </ul>
-            <p style="margin-top:0.75rem;color:#555;">
-              Sadece okuma/test amaçlı kullanın.
+          </div>
+        ` : `
+          <div style="text-align:left;font-size:0.95rem;">
+            <p style="color:#1b5e20;font-weight:bold;font-size:1.1rem;">
+              Dosyalar okunacak, hiçbir yere yazılmayacak.
             </p>
+            <ul style="margin-top:0.75rem;line-height:1.6;">
+              <li>Gerçek transfer olmaz — <code>--dry-run</code> modu ile çalışır.</li>
+              <li>Kaynak dosyalar <b>silinmez</b>.</li>
+              <li>Progress ve istatistikler <b>gerçek</b> olarak gösterilir.</li>
+              <li>Bant genişliği / okuma hızı testi için idealdir.</li>
+            </ul>
           </div>
         `,
         input: "checkbox",
-        inputPlaceholder: "Anladım, veri kaybını kabul ediyorum",
-        confirmButtonText: "Evet, gönder",
+        inputPlaceholder: isDestructive ? "Anladım, kaynak dosyalar silinecek" : "Anladım, devam ediyorum",
+        confirmButtonText: isDestructive ? "Evet, sil" : "Evet, başlat",
+        confirmButtonColor: isDestructive ? "#d32f2f" : "#388e3c",
         cancelButtonText: "İptal",
         showCancelButton: true,
         reverseButtons: true,
@@ -130,7 +141,7 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
           const popup = Swal.getPopup();
           const cb = popup?.querySelector("#swal2-checkbox") as HTMLInputElement;
           if (!cb?.checked) {
-            Swal.showValidationMessage("Veri kaybını kabul etmelisiniz");
+            Swal.showValidationMessage("Devam etmek için onaylamalısınız");
           }
         },
       });
@@ -265,14 +276,30 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
               showBlackhole
             />
             {form.dest === "(karadelik)" && (
-              <div style={{ background: "#fbe9e7", border: "1px solid #d32f2f", borderRadius: 6, padding: "0.75rem 1rem", marginTop: "0.5rem" }}>
-                <p style={{ color: "#c62828", fontWeight: 600, fontSize: "0.9rem", margin: 0 }}>
-                  ⚠️ Karadeliğe gönderilen dosyalar kalıcı olarak yok olur!
-                </p>
-                <p style={{ color: "#c62828", fontSize: "0.85rem", marginTop: "0.25rem", marginBottom: 0 }}>
-                  Sync/Move kaynak dosyaları da siler. Copy kaynağa dokunmaz.
-                  Sadece test amaçlı kullanın.
-                </p>
+              <div style={{
+                background: ["move","sync"].includes(form.operation) ? "#fbe9e7" : "#e8f5e9",
+                border: `1px solid ${["move","sync"].includes(form.operation) ? "#d32f2f" : "#388e3c"}`,
+                borderRadius: 6, padding: "0.75rem 1rem", marginTop: "0.5rem"
+              }}>
+                {["move","sync"].includes(form.operation) ? (
+                  <>
+                    <p style={{ color: "#c62828", fontWeight: 600, fontSize: "0.9rem", margin: 0 }}>
+                      ⚠️ Karadelik + {form.operation} — kaynak dosyalar kalıcı silinir!
+                    </p>
+                    <p style={{ color: "#c62828", fontSize: "0.85rem", marginTop: "0.25rem", marginBottom: 0 }}>
+                      Geri dönüşüm kutusuna gitmez. Bu işlem geri alınamaz.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ color: "#1b5e20", fontWeight: 600, fontSize: "0.9rem", margin: 0 }}>
+                      🕳️ Karadelik — <code>--dry-run</code> modu
+                    </p>
+                    <p style={{ color: "#2e7d32", fontSize: "0.85rem", marginTop: "0.25rem", marginBottom: 0 }}>
+                      Dosyalar okunur ama hiçbir yere yazılmaz. Kaynak silinmez. Hız/okuma testi için idealdir.
+                    </p>
+                  </>
+                )}
               </div>
             )}
           </div>
