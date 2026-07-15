@@ -70,7 +70,7 @@ jobs:
         run: |
           $json = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
           $json.bundle.targets = @("nsis")
-          $json.bundle.resources = @{ "../rclone-bin/windows/rclone.exe" = "rclone-bin/windows/rclone.exe" }
+          $json.bundle | Add-Member -MemberType NoteProperty -Name "resources" -Value @{ "../rclone-bin/windows/rclone.exe" = "rclone-bin/windows/rclone.exe" } -Force
           $json | ConvertTo-Json -Depth 10 | Out-File src-tauri/tauri.conf.json -Encoding utf8
 
       - name: Build Tauri App and Publish Release
