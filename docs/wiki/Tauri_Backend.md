@@ -2,7 +2,7 @@
 
 **Özet:** Rust ile yazılmış Tauri v2 backend katmanı. 17 Tauri komutunu (`#[tauri::command]`) tanımlar, process yönetimini, SQLite veritabanını, cron-tabanlı görev zamanlayıcıyı, sistem tepsisini ve diyalog pencerelerini bu katmanda barındırır.
 
-**Kütüphaneler:** tauri 2, serde 1, serde_json 1, tauri-plugin-opener 2, tauri-plugin-dialog 2, tokio, chrono, uuid, cron
+**Kütüphaneler:** tauri 2, serde 1, serde_json 1, tauri-plugin-opener 2, tauri-plugin-dialog 2, tauri-plugin-single-instance 2, tokio, chrono, uuid, cron
 
 **Bağlantılar:** [[Project_Overview]], [[React_Frontend]], [[Rclone_Integration]], [[Process_Manager]], [[State_Management]], [[Event_Stream]]
 
@@ -52,7 +52,7 @@ src-tauri/src/
 - **App identifier**: `com.beyhan.rclonegui`
 - **Window**: 800×600, başlık "rclonegui"
 - **CSP**: `null` (dev mode)
-- **Permissions**: `core:default`, `opener:default`, `dialog:default` (yerel klasör seçimi için)
+- **Permissions**: `core:default`, `opener:default`, `dialog:default` (yerel klasör seçimi için), `updater:default`, `process:allow-restart`
 - **Bundle resources**: `rclone-bin/{platform}/rclone`(.exe) paketlenir
 
 ## Komut Listesi (17 adet)
@@ -88,6 +88,7 @@ src-tauri/src/
 
 ```
 Tauri Builder
+  └── plugin(single-instance)  — ikinci instance'ı engelle, varsa pencereyi odakla
   └── plugin(opener)
   └── plugin(dialog)
   └── invoke_handler(17 komut)

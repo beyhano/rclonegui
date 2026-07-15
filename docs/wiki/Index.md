@@ -16,6 +16,7 @@
 | [[Process_Manager]] | Async süreç yaşam döngüsü (spawn, izleme, temiz sonlandırma) | ✅ Aktif |
 | [[State_Management]] | Tauri State ile çalışan süreçlerin PID, mount, task_repo, scheduler ve task_pids yönetimi | ✅ Aktif |
 | [[Event_Stream]] | stdout/stderr ayrıştırma ve frontend'e gerçek zamanlı emit | ✅ Aktif |
+| Single Instance | `tauri-plugin-single-instance` — ikinci instance'ı engeller, varsa pencereyi odaklar | ✅ Aktif |
 | [[React_Frontend]] | React 19 + TypeScript UI katmanı (4 panel) | ✅ Aktif |
 | [[Build_Config]] | Vite, pnpm, Cargo derleme araç zinciri | ✅ Aktif |
 | [[Architecture_Overview]] | Tüm sistemin katmanlı mimarî şeması | ✅ Aktif |

@@ -133,7 +133,13 @@
 - **CSS ve Koyu Mod İyileştirmeleri**: Seçim kutuları (`select`) için `appearance: none` uygulanarak Linux temalarındaki beyaz kalma hatası giderildi, özel SVG ok işaretleri yerleştirildi ve dikey hizalamalar eşitlendi.
 
 
-## 9. Değişen / Eklenen Dosyalar
+## 9. Single Instance Lock
+
+- `tauri-plugin-single-instance` eklendi — uygulama açıkken ikinci bir instance açılmaz, mevcut pencere odaklanır
+- Rust tarafında plugin kaydı + `set_focus()` callback
+- Değişen dosyalar: `Cargo.toml`, `lib.rs`
+
+## 10. Değişen / Eklenen Dosyalar
 
 ### Yeni Dosyalar
 ```
