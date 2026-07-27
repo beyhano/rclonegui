@@ -18,7 +18,7 @@
 - **Proposal**: Rclone Integration değişiklik önerisi — 6 yeni yetenek
 - **Spec**: 6 yetenek için 23 gereksinim, 33 Given/When/Then senaryosu
 - **Design**: 11 yeni Rust dosyası, 4 frontend dosyası, SQLite veri modeli (3 tablo)
-- **Tasks**: 28 task, 7 faz halinde organize edildi
+- **Tasks**: 28 task, 7 faz halinde organize edildi.
 
 İkinci SDD cycle — Task Scheduler:
 - **Preflight**: Etkileşimli mod, engram depolama, exception-ok PR, 800 satır
