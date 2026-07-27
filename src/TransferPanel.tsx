@@ -14,6 +14,10 @@ function TransferPanel() {
   const [progress, setProgress] = useState<ProgressPayload | null>(null);
   const [history, setHistory] = useState<TransferRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [gitignorePatterns, setGitignorePatterns] = useState<string[]>([]);
+  const [gitignoreLoading, setGitignoreLoading] = useState(false);
+  // Temp file path for --exclude-from (written by backend, passed to rclone)
+  const gitignoreExcludesFile = useRef<string | null>(null);
 
   // Store process metadata for event callbacks (stable ref, always up to date)
   const processMeta = useRef<Map<string, { source: string; dest: string }>>(
@@ -117,13 +121,58 @@ function TransferPanel() {
     };
   }, []);
 
+  async function loadGitignore() {
+    if (!source) return;
+    setGitignoreLoading(true);
+    setError(null);
+    try {
+      const patterns = await invoke<string[]>("parse_gitignore", { path: source });
+      setGitignorePatterns(patterns);
+      // Ask backend to write patterns to a temp file for efficient --exclude-from
+      if (patterns.length > 0) {
+        try {
+          const tmpFile = await invoke<string>("prepare_gitignore_excludes", { path: source });
+          gitignoreExcludesFile.current = tmpFile;
+        } catch (err) {
+          console.error("prepare_gitignore_excludes failed:", err);
+          gitignoreExcludesFile.current = null;
+        }
+      } else {
+        gitignoreExcludesFile.current = null;
+      }
+    } catch (err: unknown) {
+      setError(String(err));
+      setGitignorePatterns([]);
+      gitignoreExcludesFile.current = null;
+    } finally {
+      setGitignoreLoading(false);
+    }
+  }
+
   async function startTransfer() {
     if (!source || !dest) return;
     setError(null);
     try {
-      const pid = await invoke<string>("rclone_exec", {
-        args: ["copy", source, dest],
-      });
+      let excludesFile = gitignoreExcludesFile.current;
+      // Auto-load gitignore from main folder & subfolders if source is local
+      const isLocal = source.startsWith("local:") || !source.includes(":") || /^[A-Za-z]:[\\/]/.test(source);
+      if (!excludesFile && isLocal) {
+        const localPath = source.startsWith("local:") ? source.slice(6) : source;
+        try {
+          const tmpFile = await invoke<string>("prepare_gitignore_excludes", { path: localPath });
+          gitignoreExcludesFile.current = tmpFile;
+          excludesFile = tmpFile;
+        } catch (err) {
+          console.warn("Auto gitignore check:", err);
+        }
+      }
+
+      const args = ["copy", source, dest];
+      // Use --exclude-from <temp_file> (efficient, handles thousands of patterns)
+      if (excludesFile) {
+        args.push("--exclude-from", excludesFile);
+      }
+      const pid = await invoke<string>("rclone_exec", { args });
       processMeta.current.set(pid, { source, dest });
       progressPidRef.current = pid;
       setCurrentJob({ processId: pid, source, dest });
@@ -151,12 +200,27 @@ function TransferPanel() {
       <h2>Transfer Files</h2>
 
       <div className="transfer-inputs">
-        <input
-          placeholder="Source (e.g., /local/path or remote:path)"
-          value={source}
-          onChange={(e) => setSource(e.currentTarget.value)}
-          disabled={isRunning}
-        />
+        <div className="input-with-button">
+          <input
+            placeholder="Source (e.g., /local/path or remote:path)"
+            value={source}
+            onChange={(e) => { setSource(e.currentTarget.value); setGitignorePatterns([]); gitignoreExcludesFile.current = null; }}
+            disabled={isRunning}
+          />
+          <button
+            onClick={loadGitignore}
+            disabled={isRunning || !source || gitignoreLoading}
+            className="btn-gitignore"
+            title=".gitignore desenlerini yükle"
+          >
+            {gitignoreLoading ? "⏳" : "🔒"}
+          </button>
+        </div>
+        {gitignorePatterns.length > 0 && (
+          <div className="gitignore-badge">
+            .gitignore: {gitignorePatterns.length} desen yüklendi
+          </div>
+        )}
         <input
           placeholder="Destination (e.g., gdrive:backup)"
           value={dest}

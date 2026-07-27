@@ -314,7 +314,28 @@ export default function TaskFormModal({ onClose, onCreated, editTask }: Props) {
               <option value="move">Taşı</option>
               <option value="bisync">Çift Yönlü</option>
             </select>
-            <label>Hariç Tutma Kalıpları (her satıra bir tane)</label>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+              <label style={{ margin: 0 }}>Hariç Tutma Kalıpları (her satıra bir tane)</label>
+              {form.source === "local" && form.source_path && (
+                <button
+                  type="button"
+                  className="btn-gitignore-sm"
+                  onClick={async () => {
+                    try {
+                      const patterns = await invoke<string[]>("parse_gitignore", { path: form.source_path });
+                      if (patterns.length === 0) return;
+                      const merged = [...new Set([...form.exclude_patterns, ...patterns])];
+                      setForm(f => ({ ...f, exclude_patterns: merged }));
+                    } catch (e) {
+                      console.error("Gitignore yükleme hatası:", e);
+                    }
+                  }}
+                  title="Proje .gitignore'dan desenleri yükle"
+                >
+                  📥 .gitignore
+                </button>
+              )}
+            </div>
             <textarea value={form.exclude_patterns.join("\n")} onChange={e => setForm(f => ({ ...f, exclude_patterns: e.target.value.split("\n").filter(Boolean) }))} placeholder="node_modules/&#10;*.tmp&#10;.git/**" />
             <CronInput value={form.cron_expr} onChange={v => setForm(f => ({ ...f, cron_expr: v }))} />
           </div>

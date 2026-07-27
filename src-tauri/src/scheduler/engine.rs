@@ -1,11 +1,27 @@
 use chrono::Utc;
 use serde::Serialize;
+use std::path::PathBuf;
 use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use uuid::Uuid;
 
 pub use crate::db::task_repo::Task;
 use crate::rclone::events::parse_progress_line;
+
+/// Write exclude patterns to a temp file and return its path so rclone can use
+/// `--exclude-from <path>` instead of thousands of individual `--exclude` flags.
+/// Returns None when there are no patterns.
+fn write_exclude_file(exclude_patterns: &[String], process_id: Uuid) -> Option<PathBuf> {
+    if exclude_patterns.is_empty() {
+        return None;
+    }
+    let temp_path = std::env::temp_dir().join(format!("rclonegui_task_excl_{}.txt", process_id));
+    let content = exclude_patterns.join("\n");
+    match std::fs::write(&temp_path, &content) {
+        Ok(()) => Some(temp_path),
+        Err(_) => None,
+    }
+}
 
 /// Build a `tokio::process::Command` that never opens a console window on Windows.
 fn no_window_cmd(program: impl AsRef<std::ffi::OsStr>) -> tokio::process::Command {
@@ -249,21 +265,61 @@ pub async fn execute_task(
     }
 
     // Build rclone args — source/dest are full paths (e.g. "gdrive:/backups" or "C:\Users\me")
+    // Combine explicit task exclude_patterns + defaults (.git, node_modules) + auto .gitignore for local sources
+    let mut exclude_patterns = vec![
+        ".git/".to_string(),
+        ".git/**".to_string(),
+        "**/.git/".to_string(),
+        "**/.git/**".to_string(),
+        "node_modules/".to_string(),
+        "node_modules/**".to_string(),
+        "**/node_modules/".to_string(),
+        "**/node_modules/**".to_string(),
+        ".DS_Store".to_string(),
+        "**/.DS_Store".to_string(),
+    ];
+
+    for p in &task.exclude_patterns {
+        if !exclude_patterns.contains(p) {
+            exclude_patterns.push(p.clone());
+        }
+    }
+
+    let is_local_source = task.source_provider.starts_with("local:")
+        || !task.source_provider.contains(':')
+        || (task.source_provider.len() >= 3 && &task.source_provider[1..3] == ":\\");
+
+    if is_local_source {
+        let local_path = if task.source_provider.starts_with("local:") {
+            &task.source_provider[6..]
+        } else {
+            &task.source_provider
+        };
+        let p = std::path::Path::new(local_path);
+        if p.exists() {
+            if let Ok(auto_pats) = crate::commands::rclone_cmds::collect_gitignore_recursive(p) {
+                for ap in auto_pats {
+                    if !exclude_patterns.contains(&ap) {
+                        exclude_patterns.push(ap);
+                    }
+                }
+            }
+        }
+    }
+
+    let exclude_file = write_exclude_file(&exclude_patterns, process_id);
     let args: Vec<String> = if is_karadelik && is_destructive {
         // move/sync to black hole → delete source files + empty dirs
         // --rmdirs: removes empty directories after deleting files
         let mut a = vec!["delete".to_string(), task.source_provider.clone(), "--rmdirs".to_string()];
-        for pattern in &task.exclude_patterns {
-            a.push("--exclude".to_string());
-            a.push(pattern.clone());
+        if let Some(ref ef) = exclude_file {
+            a.push("--exclude-from".to_string());
+            a.push(ef.to_string_lossy().to_string());
         }
         a.push("--progress".to_string());
         a
     } else if is_karadelik {
         // copy/bisync to black hole → null WebDAV sink (streaming discard, 0 RAM, 0 disk)
-        // Flags:
-        //   --no-check-dest  : skip pre-upload PROPFIND (no destination check)
-        //   --ignore-size    : skip post-upload size verification (our null server reports 0)
         let mut a = vec![
             task.operation.clone(),
             task.source_provider.clone(),
@@ -276,9 +332,9 @@ pub async fn execute_task(
         if let Some((_, ref webdav_args)) = null_server {
             a.extend(webdav_args.iter().cloned());
         }
-        for pattern in &task.exclude_patterns {
-            a.push("--exclude".to_string());
-            a.push(pattern.clone());
+        if let Some(ref ef) = exclude_file {
+            a.push("--exclude-from".to_string());
+            a.push(ef.to_string_lossy().to_string());
         }
         a.push("--progress".to_string());
         a
@@ -289,9 +345,9 @@ pub async fn execute_task(
             task.source_provider.clone(),
             task.dest_provider.clone(),
         ];
-        for pattern in &task.exclude_patterns {
-            a.push("--exclude".to_string());
-            a.push(pattern.clone());
+        if let Some(ref ef) = exclude_file {
+            a.push("--exclude-from".to_string());
+            a.push(ef.to_string_lossy().to_string());
         }
         a.push("--progress".to_string());
         a
@@ -379,6 +435,11 @@ pub async fn execute_task(
     // Shut down the null WebDAV server if we started one
     if let Some((server_handle, _)) = null_server {
         server_handle.abort();
+    }
+
+    // Clean up the temp exclude file if we created one
+    if let Some(ref ef) = exclude_file {
+        let _ = std::fs::remove_file(ef);
     }
 
     Ok(TaskResult {

@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.10] — 2026-07-27
+
+### ✨ Yeni
+
+- **.gitignore Desteği** — TransferPanel 🔒 butonu ile kaynak klasördeki tüm `.gitignore` desenleri recursive taranır, `--exclude` flag'leri olarak rclone'a eklenir.
+- **Task .gitignore Entegrasyonu** — Zamanlanmış görevlerde 📥 .gitignore butonu, proje `.gitignore` desenlerini exclude listesine merge eder.
+- **Recursive Gitignore Tarama** — Ana klasör seçildiğinde alt projelerin tüm `.gitignore`'ları taranır, her desen kendi klasör yoluna göre prefix'lenir (`proj1/node_modules/`, `proj1/**/node_modules/`).
+
+### 🐛 Düzeltmeler
+
+- TransferPanel'de source değişince gitignore pattern'leri sıfırlanıyor (eski pattern'le çalışma hatası düzeltildi)
+
+### 🔧 Diğer
+
+- 76 test, 0 hata, 0 uyarı
+- Yeni `parse_gitignore` Tauri command'i (recursive directory walk + pattern prefix)
+
 ## [0.1.9] — 2025-07-15
 
 ### ✨ Yeni

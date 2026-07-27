@@ -331,6 +331,194 @@ pub async fn rclone_config_get(
     Ok((provider, config))
 }
 
+/// Recursively collect all `.gitignore` patterns from `path` and its subdirectories.
+///
+/// Each pattern is prefixed with its relative directory path so it applies only within
+/// that subdirectory. For simple patterns (no `/` inside), generates both the direct
+/// prefix and a `**` variant for recursive matching (e.g., `project1/node_modules/` and
+/// `project1/**/node_modules/`).
+/// Transform a single .gitignore line into rclone exclude patterns.
+///
+/// Ensures both directory paths (e.g. `dir/`, `dir/**`) and file paths are emitted
+/// so rclone excludes directories during traversal and files during copy/sync.
+fn transform_gitignore_line(rel_prefix: &str, line: &str) -> Vec<String> {
+    let line = line.trim();
+    if line.is_empty() || line.starts_with('#') {
+        return vec![];
+    }
+
+    let (negate, pat) = if let Some(rest) = line.strip_prefix('!') {
+        (true, rest.trim())
+    } else {
+        (false, line)
+    };
+
+    if pat.is_empty() {
+        return vec![];
+    }
+
+    let has_trailing_slash = pat.ends_with('/');
+    let has_leading_slash = pat.starts_with('/');
+    let clean_pat = pat.trim_start_matches('/');
+    let clean_base = clean_pat.trim_end_matches('/');
+
+    let has_internal_slash = clean_base.contains('/');
+    let is_glob = clean_base.contains('*') || clean_base.contains('?') || clean_base.contains('[');
+
+    // Determine path prefixes for rclone rule expansion
+    // Rclone matches relative paths from transfer root WITHOUT leading '/'
+    let prefixes = if rel_prefix.is_empty() {
+        vec!["".to_string()]
+    } else if has_leading_slash || has_internal_slash {
+        vec![rel_prefix.to_string()]
+    } else {
+        vec![rel_prefix.to_string(), format!("{}**/", rel_prefix)]
+    };
+
+    let mut generated = Vec::new();
+
+    for pfx in prefixes {
+        let base_path = format!("{}{}", pfx, clean_base);
+        if has_trailing_slash {
+            // Directory pattern (e.g. build/)
+            generated.push(format!("{}/", base_path));
+            generated.push(format!("{}/**", base_path));
+        } else if is_glob {
+            // Glob file/dir pattern (e.g. *.log)
+            generated.push(format!("{}{}", pfx, clean_pat));
+        } else {
+            // General pattern (e.g. build, dist, foo/bar) — can match file OR directory
+            generated.push(base_path.clone());
+            generated.push(format!("{}/", base_path));
+            generated.push(format!("{}/**", base_path));
+        }
+    }
+
+    if negate {
+        generated.into_iter().map(|s| format!("!{}", s)).collect()
+    } else {
+        generated
+    }
+}
+
+pub(crate) fn collect_gitignore_recursive(root: &std::path::Path) -> Result<Vec<String>, String> {
+    let mut all_patterns = Vec::new();
+    let root = root.canonicalize().map_err(|e| format!("Kök dizin çözülemedi: {}", e))?;
+
+    collect_gitignore_inner(&root, &root, &mut all_patterns)?;
+    Ok(all_patterns)
+}
+
+fn collect_gitignore_inner(
+    root: &std::path::Path,
+    dir: &std::path::Path,
+    patterns: &mut Vec<String>,
+) -> Result<(), String> {
+    let gitignore_path = dir.join(".gitignore");
+    if gitignore_path.exists() {
+        let content = std::fs::read_to_string(&gitignore_path)
+            .map_err(|e| format!(".gitignore okunamadı {}: {}", gitignore_path.display(), e))?;
+
+        let c_dir;
+        let rel_dir = match dir.strip_prefix(root) {
+            Ok(p) => p,
+            Err(_) => {
+                c_dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+                c_dir.strip_prefix(root).unwrap_or_else(|_| std::path::Path::new(""))
+            }
+        };
+
+        let rel_prefix = if rel_dir.as_os_str().is_empty() {
+            String::new()
+        } else {
+            format!("{}/", rel_dir.display().to_string().replace('\\', "/"))
+        };
+
+        for line in content.lines() {
+            let expanded = transform_gitignore_line(&rel_prefix, line);
+            for p in expanded {
+                if !patterns.contains(&p) {
+                    patterns.push(p);
+                }
+            }
+        }
+    }
+
+    // Recurse into subdirectories (skip .git, hidden dirs, and node_modules)
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Ok(());
+    };
+    for entry in entries.flatten() {
+        let Ok(ftype) = entry.file_type() else { continue };
+        if ftype.is_dir() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            if name_str.starts_with('.') || name_str == "node_modules" {
+                continue;
+            }
+            collect_gitignore_inner(root, &entry.path(), patterns)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Recursively parse all `.gitignore` files under the given directory path.
+///
+/// Returns patterns from every `.gitignore` found, with each pattern prefixed by its
+/// relative directory so rclone's `--exclude` applies it only in the right subdirectory.
+/// Skips blank lines and comments.
+#[tauri::command]
+pub async fn parse_gitignore(path: String) -> Result<Vec<String>, String> {
+    let root = std::path::Path::new(&path);
+    if !root.exists() {
+        return Ok(vec![]);
+    }
+    collect_gitignore_recursive(root)
+}
+
+/// Recursively collect `.gitignore` patterns from `path`, write them to a temp file,
+/// and return the temp file path so it can be passed to rclone as `--exclude-from <path>`.
+///
+/// Automatically prepends default exclude patterns for `.git`, `node_modules`, and `.DS_Store`.
+#[tauri::command]
+pub async fn prepare_gitignore_excludes(path: String) -> Result<String, String> {
+    let root = std::path::Path::new(&path);
+    if !root.exists() {
+        return Err("Kaynak dizin bulunamadı".to_string());
+    }
+    let parsed_patterns = collect_gitignore_recursive(root)?;
+
+    let mut patterns = vec![
+        ".git/".to_string(),
+        ".git/**".to_string(),
+        "**/.git/".to_string(),
+        "**/.git/**".to_string(),
+        "node_modules/".to_string(),
+        "node_modules/**".to_string(),
+        "**/node_modules/".to_string(),
+        "**/node_modules/**".to_string(),
+        ".DS_Store".to_string(),
+        "**/.DS_Store".to_string(),
+    ];
+
+    for p in parsed_patterns {
+        if !patterns.contains(&p) {
+            patterns.push(p);
+        }
+    }
+
+    let temp_path = std::env::temp_dir().join(format!(
+        "rclonegui_excludes_{}.txt",
+        uuid::Uuid::new_v4()
+    ));
+    let content = patterns.join("\n");
+    std::fs::write(&temp_path, &content)
+        .map_err(|e| format!("Geçici exclude dosyası yazılamadı: {}", e))?;
+
+    Ok(temp_path.to_string_lossy().to_string())
+}
+
 /// Delete an rclone remote via `rclone config delete <name>`.
 #[tauri::command]
 pub async fn rclone_config_delete(
@@ -666,4 +854,127 @@ mod tests {
             );
         }
     }
+
+    // ------------------------------------------------------------------
+    // parse_gitignore tests
+    // ------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_parse_gitignore_file_not_found_returns_empty() {
+        let tmp = std::env::temp_dir().join(format!("gitignore_test_{}", Uuid::new_v4()));
+        let result = parse_gitignore(tmp.to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_parse_gitignore_skips_blanks_and_comments() {
+        let tmp = std::env::temp_dir().join(format!("gitignore_test_{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let gitignore_path = tmp.join(".gitignore");
+        std::fs::write(&gitignore_path, "# comment\n\nnode_modules/\n*.log\n\n# another comment\nbuild/\n").unwrap();
+
+        let result = parse_gitignore(tmp.to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+        let patterns = result.unwrap();
+        assert_eq!(patterns, vec!["node_modules/", "node_modules/**", "*.log", "build/", "build/**"]);
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn test_parse_gitignore_returns_all_valid_patterns() {
+        let tmp = std::env::temp_dir().join(format!("gitignore_test_{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let gitignore_path = tmp.join(".gitignore");
+        std::fs::write(&gitignore_path, ".env\n/dist\n!important/\n__pycache__/\n*.swp\n.DS_Store\n").unwrap();
+
+        let result = parse_gitignore(tmp.to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+        let patterns = result.unwrap();
+        assert_eq!(patterns, vec![
+            ".env", ".env/", ".env/**",
+            "dist", "dist/", "dist/**",
+            "!important/", "!important/**",
+            "__pycache__/", "__pycache__/**",
+            "*.swp",
+            ".DS_Store", ".DS_Store/", ".DS_Store/**"
+        ]);
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn test_parse_gitignore_recursive_subdirs() {
+        let tmp = std::env::temp_dir().join(format!("gitignore_test_{}", Uuid::new_v4()));
+
+        // Create structure:
+        //   .gitignore -> *.log
+        //   proj1/.gitignore -> node_modules/, /build/
+        //   proj2/.gitignore -> .env
+        //   proj1/sub/.gitignore -> *.tmp
+        std::fs::create_dir_all(&tmp.join("proj1/sub")).unwrap();
+        std::fs::create_dir_all(&tmp.join("proj2")).unwrap();
+
+        std::fs::write(tmp.join(".gitignore"), "*.log\n").unwrap();
+        std::fs::write(tmp.join("proj1/.gitignore"), "node_modules/\n/build/\n").unwrap();
+        std::fs::write(tmp.join("proj1/sub/.gitignore"), "*.tmp\n").unwrap();
+        std::fs::write(tmp.join("proj2/.gitignore"), ".env\n").unwrap();
+
+        let result = parse_gitignore(tmp.to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+        let mut patterns = result.unwrap();
+        patterns.sort(); // order-independent comparison
+
+        let mut expected = vec![
+            "*.log",
+            "proj1/node_modules/",
+            "proj1/node_modules/**",
+            "proj1/**/node_modules/",
+            "proj1/**/node_modules/**",
+            "proj1/build/",
+            "proj1/build/**",
+            "proj1/sub/*.tmp",
+            "proj1/sub/**/*.tmp",
+            "proj2/.env",
+            "proj2/.env/",
+            "proj2/.env/**",
+            "proj2/**/.env",
+            "proj2/**/.env/",
+            "proj2/**/.env/**",
+        ];
+        expected.sort();
+
+        assert_eq!(patterns, expected);
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[tokio::test]
+    async fn test_parse_gitignore_skips_hidden_and_node_dirs() {
+        let tmp = std::env::temp_dir().join(format!("gitignore_test_{}", Uuid::new_v4()));
+
+        // Create:
+        //   proj1/.gitignore -> *.log
+        //   .hidden/.gitignore -> should be skipped
+        //   node_modules/.gitignore -> should be skipped
+        std::fs::create_dir_all(&tmp.join("proj1")).unwrap();
+        std::fs::create_dir_all(&tmp.join(".hidden")).unwrap();
+        std::fs::create_dir_all(&tmp.join("node_modules").join("pkg")).unwrap();
+
+        std::fs::write(tmp.join("proj1/.gitignore"), "*.log\n").unwrap();
+        std::fs::write(tmp.join(".hidden/.gitignore"), "secret\n").unwrap();
+        std::fs::write(tmp.join("node_modules/.gitignore"), "ignored\n").unwrap();
+        std::fs::write(tmp.join("node_modules/pkg/.gitignore"), "also_ignored\n").unwrap();
+
+        let result = parse_gitignore(tmp.to_string_lossy().to_string()).await;
+        assert!(result.is_ok());
+        let patterns = result.unwrap();
+
+        // Should only contain patterns from proj1/.gitignore
+        assert!(patterns.contains(&"proj1/*.log".to_string()));
+        assert!(patterns.contains(&"proj1/**/*.log".to_string()));
+        // Should NOT contain patterns from skipped dirs
+        assert!(!patterns.iter().any(|p| p.contains(".hidden")));
+        assert!(!patterns.iter().any(|p| p.contains("node_modules")));
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
 }
+

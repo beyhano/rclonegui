@@ -44,6 +44,8 @@ pub fn run() {
             commands::rclone_cmds::rclone_config_get,
             commands::rclone_cmds::rclone_config_delete,
             commands::rclone_cmds::rclone_list_dirs,
+            commands::rclone_cmds::parse_gitignore,
+            commands::rclone_cmds::prepare_gitignore_excludes,
             commands::task_cmds::task_list,
             commands::task_cmds::task_create,
             commands::task_cmds::task_update,
