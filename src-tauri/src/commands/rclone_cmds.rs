@@ -19,6 +19,7 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 use tauri::{Emitter, State};
+use tauri_plugin_updater::UpdaterExt;
 use tokio::io::BufReader;
 use uuid::Uuid;
 
@@ -685,6 +686,64 @@ pub async fn rclone_selfupdate(state: State<'_, AppState>) -> Result<SelfUpdateR
         new_version,
         message: "rclone başarıyla güncellendi.".to_string(),
     })
+}
+
+#[derive(Serialize)]
+pub struct AppUpdateStatus {
+    pub available: bool,
+    pub version: String,
+    pub current_version: String,
+    pub body: Option<String>,
+}
+
+/// Check if a new version of the RCloneGUI app is available on GitHub Releases.
+#[tauri::command]
+pub async fn check_app_update(app: tauri::AppHandle) -> Result<AppUpdateStatus, String> {
+    let current_version = app.package_info().version.to_string();
+    let updater = app.updater().map_err(|e| format!("Updater başlatılamadı: {e}"))?;
+    let update = updater.check().await.map_err(|e| format!("Güncelleme kontrolü başarısız: {e}"))?;
+
+    if let Some(update) = update {
+        Ok(AppUpdateStatus {
+            available: true,
+            version: update.version,
+            current_version,
+            body: update.body,
+        })
+    } else {
+        Ok(AppUpdateStatus {
+            available: false,
+            version: current_version.clone(),
+            current_version,
+            body: None,
+        })
+    }
+}
+
+/// Download and install the latest version of RCloneGUI app, then restart.
+#[tauri::command]
+pub async fn install_app_update(app: tauri::AppHandle) -> Result<(), String> {
+    let updater = app.updater().map_err(|e| format!("Updater başlatılamadı: {e}"))?;
+    let update = updater.check().await.map_err(|e| format!("Güncelleme kontrolü başarısız: {e}"))?;
+
+    if let Some(update) = update {
+        let mut downloaded = 0;
+        update
+            .download_and_install(
+                move |chunk_length, content_length| {
+                    downloaded += chunk_length;
+                    println!("İndirilen: {} / {:?}", downloaded, content_length);
+                },
+                || {
+                    println!("İndirme tamamlandı!");
+                },
+            )
+            .await
+            .map_err(|e| format!("Güncelleme yüklenemedi: {e}"))?;
+
+        app.restart();
+    }
+    Ok(())
 }
 
 // ----- Task 4.4 RED test: rclone_config_list error path -----

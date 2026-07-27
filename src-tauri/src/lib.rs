@@ -56,6 +56,8 @@ pub fn run() {
             commands::task_cmds::task_running_list,
             commands::task_cmds::rclone_providers,
             commands::rclone_cmds::rclone_selfupdate,
+            commands::rclone_cmds::check_app_update,
+            commands::rclone_cmds::install_app_update,
         ])
         .setup(|app| {
             // Initialize SQLite database in the app data directory
