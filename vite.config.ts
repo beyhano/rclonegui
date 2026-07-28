@@ -16,15 +16,6 @@ export default defineConfig(async () => ({
     },
   ],
 
-  // Use relative asset paths so Tauri v2 production webview resolves them correctly
-  base: "./",
-
-  build: {
-    modulePreload: false,
-  },
-
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
   // 2. tauri expects a fixed port, fail if that port is not available
