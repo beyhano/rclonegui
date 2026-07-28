@@ -42,7 +42,7 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev libfuse2 libgles2-mesa-dev libgl1-mesa-dri libegl1-mesa-dev squashfs-tools
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libgtk-3-dev libfuse2
 
       - name: Frontend bagimliliklari
         run: pnpm install --frozen-lockfile
@@ -53,33 +53,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: 'rcloneguikey'
+          NO_STRIP: 'true'
         with:
           tagName: v__VERSION__
           releaseName: 'rclonegui v__VERSION__'
           releaseBody: 'Detayli degisiklik listesi icin CHANGELOG.md dosyasina bakin.'
           releaseDraft: false
           prerelease: false
-
-      - name: AppImage WebKit EGL patch (Linux)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          APPIMAGE=$(find src-tauri/target/release/bundle/appimage -name "*.AppImage" | head -1)
-          echo "Patching: $APPIMAGE"
-
-          # Extract AppImage
-          cd /tmp
-          $APPIMAGE --appimage-extract
-          
-          # Inject WebKit env var into the gtk plugin hook
-          HOOK="squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh"
-          if [ -f "$HOOK" ]; then
-            sed -i '2a export WEBKIT_DISABLE_DMABUF_RENDERER=1\nexport WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1' "$HOOK"
-            echo "Hook patched successfully"
-            head -10 "$HOOK"
-          fi
-          
-          # Repack with appimagetool
-          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -O appimagetool
-          chmod +x appimagetool
-          ARCH=x86_64 ./appimagetool --no-appstream squashfs-root "$APPIMAGE"
-          echo "AppImage repackaged: $(ls -lh $APPIMAGE)"
